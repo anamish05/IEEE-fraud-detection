@@ -1,0 +1,20 @@
+# Jupyter Notebook Support
+ipykernel
+
+# Data Manipulation & Numerical Computing
+pandas
+numpy
+scikit-learn
+
+# Visualization
+matplotlib
+seaborn
+
+# Data Retrieval & Competition Access
+kagglehub
+
+# Deep Learning / Accelerators (used in your device check)
+torch
+
+pyarrow
+lightgbm
