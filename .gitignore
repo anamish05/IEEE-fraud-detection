@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Data folders & file types
+data/interim/*.csv
+data/interim/*.parquet
+data/processed/*.csv
+data/processed/*.parquet
+interim/
+processed/
+*.csv
+*.parquet
+
+# MLflow tracking & artifacts
+mlruns/
+mlartifacts/
+.trash/
