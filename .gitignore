@@ -231,3 +231,6 @@ processed/
 mlruns/
 mlartifacts/
 .trash/
+
+*.db
+mlflow.db
