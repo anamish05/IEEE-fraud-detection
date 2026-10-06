@@ -1,3 +1,4 @@
+import os
 import json
 from pathlib import Path
 import lightgbm as lgb
@@ -7,7 +8,7 @@ from .duckdb_store import DuckDBStateStore
 import dagshub
 import mlflow
 import mlflow.lightgbm
-from src.config import DAGSHUB_USERNAME, DAGSHUB_REPO
+from src.config import DAGSHUB_USERNAME, DAGSHUB_REPO, artifacts_path
 from dotenv import load_dotenv
 
 class TransactionStreamer:
@@ -19,6 +20,7 @@ class TransactionStreamer:
         target_enc_path: str,
         freq_enc_path: str,
         train_warmup_path: str,
+        cat_features_path:str,
         thresholds_path: str=None
     ):
         # Initialize DB and warm up state
@@ -51,8 +53,11 @@ class TransactionStreamer:
         with open(freq_enc_path, "r") as f:
             self.freq_data = json.load(f)
 
-        with open("v_clusters.json", "r") as f:
+        with open(os.path.join(artifacts_path, "v_clusters.json"), "r") as f:
             self.v_clusters=json.load(f)
+
+        with open(cat_features_path, "r") as f:
+            self.cat_features = json.load(f)
 
         if thresholds_path:
             with open(thresholds_path, 'r') as f:
@@ -74,7 +79,7 @@ class TransactionStreamer:
 
             # Create stream view
             self.store.con.execute(f"""
-                CREATE VIEW test_stream_view AS 
+                CREATE OR REPLACE VIEW test_stream_view AS 
                 SELECT 
                     t.*, 
                     i.id_01, i.id_02, i.id_03, i.id_04, i.id_05, i.id_06, i.id_07, i.id_08,
@@ -87,8 +92,8 @@ class TransactionStreamer:
                     ((t.TransactionDT // 86400) - t.D1) AS card_birthday,
                     (t.TransactionDT // 3600) % 24 AS hour_of_day,
                     (t.TransactionDT // (3600 * 24)) % 7 AS day_of_week
-                FROM read_parquet('{test_trans_path}') t
-                LEFT JOIN read_parquet('{test_ident_path}') i ON t.TransactionID = i.TransactionID
+                FROM read_csv('{test_trans_path}') t
+                LEFT JOIN read_csv('{test_ident_path}') i ON t.TransactionID = i.TransactionID
                 ORDER BY t.TransactionDT ASC;
             """)
 
@@ -110,7 +115,7 @@ class TransactionStreamer:
                     WITH combined_stream AS (
                         -- Active historical state
                         SELECT 
-                            -1::BIGINT AS TransactionID, Pseudo_UID, event_time, TransactionAmt, 
+                            -1::BIGINT AS TransactionID, Pseudo_UID, event_time, amount as TransactionAmt, 
                             FALSE AS is_chunk
                         FROM active_user_store
                         
@@ -129,7 +134,7 @@ class TransactionStreamer:
                             -- Transactions in preceding 24 hours (excluding current record)
                             COUNT(TransactionAmt) OVER (
                                 PARTITION BY Pseudo_UID 
-                                ORDER BY event_time, is_chunk, TransactionID
+                                ORDER BY event_time
                                 RANGE BETWEEN INTERVAL 24 HOUR PRECEDING AND INTERVAL 1 MICROSECOND PRECEDING
                             ) AS uid_count_24h,
                             
@@ -137,7 +142,7 @@ class TransactionStreamer:
                             COALESCE(
                                 AVG(TransactionAmt) OVER (
                                     PARTITION BY Pseudo_UID 
-                                    ORDER BY event_time, is_chunk, TransactionID
+                                    ORDER BY event_time
                                     RANGE BETWEEN INTERVAL 24 HOUR PRECEDING AND INTERVAL 1 MICROSECOND PRECEDING
                                 ), 0.0
                             ) AS uid_amt_mean_24h,
@@ -159,7 +164,7 @@ class TransactionStreamer:
                         ) AS uid_dt_diff
                     FROM current_chunk c
                     JOIN rolling_stats s ON c.TransactionID = s.TransactionID
-                    LEFT JOIN user_last_tx ult ON c.PseudoID=ult.pseudouid
+                    LEFT JOIN user_last_tx ult ON c.Pseudo_UID=ult.pseudo_uid
                     WHERE s.is_chunk = TRUE
                     ORDER BY c.TransactionDT ASC, c.TransactionID ASC;
                 """).df()
@@ -177,8 +182,17 @@ class TransactionStreamer:
                 for block_name, v_cols in self.v_clusters.items():
                     chunk_with_features_df[block_name]=chunk_with_features_df[v_cols].notna().any(axis=1)
 
+                chunk_with_features_df["TransactionDTDays"] = chunk_with_features_df["TransactionDT"] / 86400   
+
+
                 # Predict
-                X_chunk = chunk_with_features_df[self.model_features]
+                X_chunk = chunk_with_features_df[self.model_features].copy()
+              
+                for col in self.cat_features:
+                    if col not in X_chunk.columns:
+                        raise ValueError(f"Categorical feature {col} is missing from inference data")
+                    X_chunk[col] = X_chunk[col].astype("category")
+
                 preds = self.model.predict(X_chunk)
 
                 conditions = [preds < self.policy['t_review'], (preds >= self.policy['t_review'])&(preds < self.policy['t_decline']), preds >= self.policy['t_decline'] ]
@@ -260,7 +274,7 @@ class TransactionStreamer:
                 "fraud_rate": float(sub_df["isFraud"].mean())
             })
             mlflow.log_metrics(summary_metrics)
-            mlflow.log_artifact("configs/thresholds.json")
+            #mlflow.log_artifact("artifacts/thresholds.json")
 
 
 

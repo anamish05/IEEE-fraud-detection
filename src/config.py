@@ -3,11 +3,15 @@ import os
 from dotenv import load_dotenv
 
 root_dir = Path(__file__).resolve().parent.parent
+src_path=Path(__file__).resolve().parent
+
 data_dir = root_dir / 'data'
 raw_data_path = data_dir / "raw"
 interim_data_path = data_dir / "interim"
 processed_data_path = data_dir / "processed" 
 processed_dataset = processed_data_path/"features_static_after_split_TE.parquet"
+
+artifacts_path = src_path / "artifacts"
 
 # features
 TARGET = 'isFraud'

@@ -15,11 +15,11 @@ def rolling_24h_stats_per_user(df):
     # Temporal Velocity Aggregations (Before Split)
 
     # Sort dataframe by UID and TransactionDT (in-place to save memory)
-    df.sort_values(['UID_COL', 'datetime'], inplace=True)
+    df.sort_values([UID_COL, 'datetime'], inplace=True)
     df.reset_index(drop=True, inplace=True)
 
     # Extract minimal 1D arrays
-    uids = df['UID_COL'].values
+    uids = df[UID_COL].values
     times = df['datetime'].values
     amts = df['TransactionAmt'].values
 

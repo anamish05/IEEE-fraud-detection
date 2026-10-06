@@ -9,6 +9,7 @@ def export_training_artifacts(
     te_features: list,
     freq_cols: list,
     features: list,
+    cat_features:list,
     artifacts_dir: Path = Path("artifacts"),
     smoothing: float = 10.0,
 ):
@@ -43,5 +44,8 @@ def export_training_artifacts(
 
     with open(artifacts_dir / "model_features.json", "w") as f:
         json.dump(features, f, indent=2)
+
+    with open(artifacts_dir / "cat_features.json", "w") as f:
+            json.dump(cat_features, f, indent=2)
 
     print(f"Artifacts successfully exported to: {artifacts_dir.resolve()}")
