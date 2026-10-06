@@ -14,6 +14,13 @@ TARGET = 'isFraud'
 TIME_COL = 'TransactionDT'
 UID_COL = 'Pseudo_UID'
 SEED = 42
+freq_cols = [
+    'card1', 'card2', 'card3', 'card5',
+    'addr1', 'addr2',
+    'P_emaildomain', 'R_emaildomain',
+    'DeviceInfo', 'id_30', 'id_31', 'id_33',
+    'Pseudo_UID'
+]
 
 # dagshub
 load_dotenv()

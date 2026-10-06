@@ -1,0 +1,13 @@
+{
+  "policy_name": "balanced_cost_minimization_v1",
+  "version": "1.0",
+  "thresholds": {
+    "t_review": 0.05,
+    "t_decline": 0.35
+  },
+  "economics": {
+    "chargeback_fee": 15.0,
+    "manual_review_cost": 2.5,
+    "max_monthly_review_capacity": 5000
+  }
+}
