@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="880" viewBox="0 0 1500 880" role="img" aria-labelledby="title desc">
+  <title id="title">Streaming fraud inference and decisioning</title>
+  <desc id="desc">Chronological test transactions are joined and processed in chunks with DuckDB state, enriched with saved training artifacts, scored by LightGBM, routed by thresholds, and logged as outputs.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#71829b"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#148a8a"/>
+    </marker>
+    <style>
+      .title { font: 700 32px 'Segoe UI', Arial, sans-serif; fill: #14243a; }
+      .subtitle { font: 400 15px 'Segoe UI', Arial, sans-serif; fill: #60718a; }
+      .heading { font: 700 15px 'Segoe UI', Arial, sans-serif; fill: #1d324b; }
+      .label { font: 600 13px 'Segoe UI', Arial, sans-serif; fill: #2c4059; }
+      .body { font: 400 12px 'Segoe UI', Arial, sans-serif; fill: #5b6d84; }
+      .small { font: 400 11px 'Segoe UI', Arial, sans-serif; fill: #6d7e94; }
+      .tiny { font: 600 10px 'Segoe UI', Arial, sans-serif; letter-spacing: .7px; fill: #71829a; }
+      .chip { font: 600 11px 'Segoe UI', Arial, sans-serif; fill: #3b5876; }
+      .card { fill: #fff; stroke: #dbe4ef; stroke-width: 1.4; }
+      .line { fill: none; stroke: #71829b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .line-teal { fill: none; stroke: #148a8a; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow-teal); }
+    </style>
+  </defs>
+
+  <rect width="1500" height="880" fill="#f4f7fb"/>
+  <circle cx="1405" cy="78" r="128" fill="#eaf2f8"/>
+  <circle cx="1437" cy="61" r="70" fill="#e1edf4"/>
+
+  <text x="60" y="61" class="title">Streaming Fraud Inference &amp; Decisioning</text>
+  <text x="62" y="90" class="subtitle">06_test_inference.ipynb  |  chronological, stateful scoring with LightGBM</text>
+  <rect x="1226" y="42" width="214" height="34" rx="17" fill="#e5f3f2"/>
+  <circle cx="1246" cy="59" r="5" fill="#148a8a"/>
+  <text x="1260" y="63" class="tiny" fill="#147b7b">INFERENCE WORKFLOW</text>
+
+  <!-- Primary scoring flow -->
+  <rect x="60" y="145" width="245" height="160" rx="16" class="card"/>
+  <rect x="60" y="145" width="245" height="7" rx="4" fill="#5076a5"/>
+  <circle cx="86" cy="177" r="13" fill="#5076a5"/>
+  <text x="86" y="181" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">01</text>
+  <text x="108" y="182" class="heading">Test data</text>
+  <rect x="82" y="203" width="201" height="29" rx="7" fill="#eef3fa"/>
+  <text x="182" y="222" text-anchor="middle" class="chip">test_transaction.csv</text>
+  <rect x="82" y="240" width="201" height="29" rx="7" fill="#eef3fa"/>
+  <text x="182" y="259" text-anchor="middle" class="chip">test_identity.csv</text>
+  <text x="82" y="286" class="small">Join on transaction ID</text>
+
+  <path d="M305 225 H344" class="line"/>
+  <rect x="355" y="145" width="220" height="160" rx="16" class="card"/>
+  <rect x="355" y="145" width="220" height="7" rx="4" fill="#5076a5"/>
+  <circle cx="381" cy="177" r="13" fill="#5076a5"/>
+  <text x="381" y="181" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">02</text>
+  <text x="403" y="182" class="heading">Order &amp; chunk</text>
+  <text x="379" y="222" class="body">Sort by transaction time</text>
+  <text x="379" y="245" class="body">Process in manageable batches</text>
+  <rect x="379" y="262" width="171" height="24" rx="12" fill="#eef3fa"/>
+  <text x="464" y="278" text-anchor="middle" class="tiny">CHRONOLOGICAL STREAM</text>
+
+  <path d="M575 225 H614" class="line"/>
+  <rect x="625" y="145" width="265" height="160" rx="16" class="card"/>
+  <rect x="625" y="145" width="265" height="7" rx="4" fill="#148a8a"/>
+  <circle cx="651" cy="177" r="13" fill="#148a8a"/>
+  <text x="651" y="181" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">03</text>
+  <text x="673" y="182" class="heading">Causal state features</text>
+  <text x="649" y="220" class="body">DuckDB combines recent history + batch</text>
+  <text x="649" y="243" class="body">Prior 24h count and amount average</text>
+  <text x="649" y="266" class="body">Time since previous user transaction</text>
+  <text x="649" y="289" class="small">Append events; evict history beyond 24h</text>
+
+  <path d="M890 225 H929" class="line"/>
+  <rect x="940" y="145" width="245" height="160" rx="16" class="card"/>
+  <rect x="940" y="145" width="245" height="7" rx="4" fill="#d18a36"/>
+  <circle cx="966" cy="177" r="13" fill="#d18a36"/>
+  <text x="966" y="181" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">04</text>
+  <text x="988" y="182" class="heading">Rebuild model inputs</text>
+  <text x="964" y="220" class="body">Apply frozen encodings and flags</text>
+  <text x="964" y="243" class="body">Select saved feature names and order</text>
+  <text x="964" y="266" class="body">Cast categorical columns consistently</text>
+  <text x="964" y="289" class="small">Match model training schema</text>
+
+  <path d="M1185 225 H1224" class="line"/>
+  <rect x="1235" y="145" width="205" height="160" rx="16" class="card"/>
+  <rect x="1235" y="145" width="205" height="7" rx="4" fill="#7657a8"/>
+  <circle cx="1261" cy="177" r="13" fill="#7657a8"/>
+  <text x="1261" y="181" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">05</text>
+  <text x="1283" y="182" class="heading">LightGBM score</text>
+  <text x="1259" y="220" class="body">Predict risk per transaction</text>
+  <text x="1259" y="243" class="body">Return fraud probability</text>
+  <rect x="1259" y="262" width="156" height="24" rx="12" fill="#f1ecf7"/>
+  <text x="1337" y="278" text-anchor="middle" class="tiny">MODEL OUTPUT</text>
+
+  <!-- Supporting state and deployment artifacts -->
+  <rect x="625" y="370" width="265" height="144" rx="16" class="card"/>
+  <rect x="625" y="370" width="265" height="7" rx="4" fill="#148a8a"/>
+  <text x="649" y="408" class="heading">Historical warm-up</text>
+  <text x="649" y="434" class="body">Processed training data seeds DuckDB</text>
+  <text x="649" y="456" class="body">Recent 24h events + last user timestamps</text>
+  <text x="649" y="483" class="small">Supports causal features from first batch</text>
+  <path d="M757 370 V315" class="line-teal"/>
+
+  <rect x="940" y="370" width="245" height="144" rx="16" class="card"/>
+  <rect x="940" y="370" width="245" height="7" rx="4" fill="#d18a36"/>
+  <text x="964" y="408" class="heading">Training artifacts</text>
+  <text x="964" y="434" class="body">Model feature + category schemas</text>
+  <text x="964" y="456" class="body">Target / frequency encodings</text>
+  <text x="964" y="478" class="body">Decision thresholds + V-feature groups</text>
+  <text x="964" y="500" class="small">Loaded with the MLflow model</text>
+  <path d="M1062 370 V315" class="line-teal"/>
+
+  <!-- Decision and output flow -->
+  <path d="M1337 305 V592" class="line"/>
+  <rect x="960" y="605" width="480" height="143" rx="16" class="card"/>
+  <rect x="960" y="605" width="480" height="7" rx="4" fill="#3c8b69"/>
+  <circle cx="986" cy="637" r="13" fill="#3c8b69"/>
+  <text x="986" y="641" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">06</text>
+  <text x="1008" y="642" class="heading">Threshold-based decisioning</text>
+  <text x="984" y="673" class="body">Apply policy thresholds to each predicted risk score</text>
+  <rect x="984" y="697" width="126" height="31" rx="8" fill="#eaf4ee"/>
+  <text x="1047" y="717" text-anchor="middle" class="chip">APPROVE</text>
+  <rect x="1122" y="697" width="126" height="31" rx="8" fill="#fbf5e9"/>
+  <text x="1185" y="717" text-anchor="middle" class="chip">REVIEW</text>
+  <rect x="1260" y="697" width="154" height="31" rx="8" fill="#f8eded"/>
+  <text x="1337" y="717" text-anchor="middle" class="chip">DECLINE</text>
+
+  <path d="M960 676 H914" class="line"/>
+  <rect x="625" y="605" width="275" height="143" rx="16" class="card"/>
+  <rect x="625" y="605" width="275" height="7" rx="4" fill="#5076a5"/>
+  <circle cx="651" cy="637" r="13" fill="#5076a5"/>
+  <text x="651" y="641" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">07</text>
+  <text x="673" y="642" class="heading">Output &amp; monitoring</text>
+  <text x="649" y="675" class="body">Submission CSV: ID, score, decision</text>
+  <text x="649" y="698" class="body">MLflow: run, metrics, output artifact</text>
+  <text x="649" y="726" class="small">Expected-loss summaries are estimates</text>
+
+  <!-- Report scope -->
+  <rect x="60" y="790" width="1380" height="56" rx="14" fill="#fff" stroke="#e0e7ef"/>
+  <circle cx="87" cy="818" r="12" fill="#eaf0f7"/>
+  <text x="87" y="822" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#5076a5">i</text>
+  <text x="111" y="814" class="label">Serving scope</text>
+  <text x="111" y="832" class="body">This inference path uses LightGBM; the neural-network rank blend is evaluated offline, not served here.</text>
+  <text x="1420" y="866" text-anchor="end" class="tiny">IEEE-CIS FRAUD DETECTION</text>
+</svg>

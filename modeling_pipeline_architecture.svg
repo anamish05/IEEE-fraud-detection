@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1290" viewBox="0 0 1600 1290" role="img" aria-labelledby="title desc">
+  <title id="title">End-to-end fraud detection modeling pipeline</title>
+  <desc id="desc">IEEE-CIS transaction and identity data flow through feature engineering, LightGBM and a three-branch multimodal neural network, rank-normalized ensemble evaluation, and streaming decisioning.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#71829b"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#148a8a"/>
+    </marker>
+    <style>
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #14243a; }
+      .subtitle { font: 400 16px 'Segoe UI', Arial, sans-serif; fill: #60718a; }
+      .section { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #172a43; }
+      .section-no { font: 700 12px 'Segoe UI', Arial, sans-serif; letter-spacing: 1.2px; fill: #fff; }
+      .label { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #243953; }
+      .body { font: 400 13px 'Segoe UI', Arial, sans-serif; fill: #5b6d84; }
+      .small { font: 400 11px 'Segoe UI', Arial, sans-serif; fill: #6d7e94; }
+      .tiny { font: 600 10px 'Segoe UI', Arial, sans-serif; letter-spacing: .7px; fill: #73839a; }
+      .chip { font: 600 11px 'Segoe UI', Arial, sans-serif; fill: #35516e; }
+      .card { fill: #fff; stroke: #dbe4ef; stroke-width: 1.4; }
+      .soft { fill: #f7f9fc; stroke: #e3eaf2; stroke-width: 1; }
+      .line { fill: none; stroke: #71829b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .line-plain { fill: none; stroke: #a4b1c1; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .line-teal { fill: none; stroke: #148a8a; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow-teal); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1290" fill="#f4f7fb"/>
+  <circle cx="1470" cy="82" r="130" fill="#eaf2f8"/>
+  <circle cx="1510" cy="60" r="70" fill="#e1edf4"/>
+
+  <text x="64" y="61" class="title">Fraud Detection Modeling Pipeline</text>
+  <text x="66" y="91" class="subtitle">IEEE-CIS | engineered tabular signals + behavioral sequences + device semantics</text>
+  <rect x="1324" y="42" width="212" height="34" rx="17" fill="#e5f3f2"/>
+  <circle cx="1343" cy="59" r="5" fill="#148a8a"/>
+  <text x="1356" y="63" class="tiny" fill="#147b7b">END-TO-END WORKFLOW</text>
+
+  <!-- Data ingestion and engineered feature store -->
+  <rect x="60" y="130" width="340" height="182" rx="16" class="card"/>
+  <rect x="60" y="130" width="340" height="8" rx="4" fill="#5076a5"/>
+  <circle cx="88" cy="166" r="14" fill="#5076a5"/>
+  <text x="88" y="170" text-anchor="middle" class="section-no">01</text>
+  <text x="112" y="172" class="section">Data ingestion</text>
+  <text x="84" y="207" class="label">IEEE-CIS source tables</text>
+  <rect x="84" y="222" width="132" height="27" rx="7" fill="#eef3fa"/>
+  <text x="150" y="240" text-anchor="middle" class="chip">Transactions</text>
+  <rect x="228" y="222" width="132" height="27" rx="7" fill="#eef3fa"/>
+  <text x="294" y="240" text-anchor="middle" class="chip">Identity</text>
+  <text x="84" y="277" class="body">Join, inspect, clean and prune</text>
+  <text x="84" y="295" class="small">01_EDA.ipynb</text>
+
+  <path d="M400 221 H444" class="line"/>
+
+  <rect x="455" y="130" width="1085" height="182" rx="16" class="card"/>
+  <rect x="455" y="130" width="1085" height="8" rx="4" fill="#148a8a"/>
+  <circle cx="483" cy="166" r="14" fill="#148a8a"/>
+  <text x="483" y="170" text-anchor="middle" class="section-no">02</text>
+  <text x="507" y="172" class="section">Feature engineering &amp; feature store</text>
+  <text x="507" y="197" class="small">02_feature_engineering.ipynb  |  processed Parquet dataset</text>
+
+  <rect x="490" y="218" width="242" height="66" rx="10" fill="#eef7f7"/>
+  <text x="508" y="241" class="label">Entity &amp; time</text>
+  <text x="508" y="262" class="small">Pseudo-user keys; hour/day features</text>
+
+  <rect x="746" y="218" width="242" height="66" rx="10" fill="#eef7f7"/>
+  <text x="764" y="241" class="label">Causal behavior</text>
+  <text x="764" y="262" class="small">Prior 24h velocity; previous-event gap</text>
+
+  <rect x="1002" y="218" width="242" height="66" rx="10" fill="#eef7f7"/>
+  <text x="1020" y="241" class="label">Categorical signals</text>
+  <text x="1020" y="262" class="small">Frequency + split-aware target encoding</text>
+
+  <rect x="1258" y="218" width="247" height="66" rx="10" fill="#eef7f7"/>
+  <text x="1276" y="241" class="label">Feature outputs</text>
+  <text x="1276" y="262" class="small">Flags, static features, train/valid splits</text>
+
+  <!-- Shared feature flow and model branches -->
+  <path d="M998 312 V350" class="line-plain"/>
+  <path d="M343 350 H1098" class="line-plain"/>
+  <path d="M343 350 V386" class="line"/>
+  <path d="M1098 350 V386" class="line"/>
+
+  <rect x="60" y="400" width="565" height="332" rx="18" class="card"/>
+  <rect x="60" y="400" width="565" height="8" rx="4" fill="#5076a5"/>
+  <circle cx="90" cy="439" r="15" fill="#5076a5"/>
+  <text x="90" y="443" text-anchor="middle" class="section-no">03</text>
+  <text x="116" y="445" class="section">Baseline &amp; LightGBM</text>
+  <text x="84" y="470" class="small">03_LGBM.ipynb  |  tabular modeling track</text>
+
+  <rect x="84" y="491" width="517" height="79" rx="11" fill="#f4f7fb" stroke="#e1e8f0"/>
+  <rect x="101" y="508" width="36" height="36" rx="9" fill="#e6edf6"/>
+  <text x="119" y="531" text-anchor="middle" class="label">LR</text>
+  <text x="153" y="519" class="label">Logistic regression baseline</text>
+  <text x="153" y="542" class="body">Imputation + scaling; expanding-window temporal evaluation</text>
+
+  <rect x="84" y="586" width="517" height="119" rx="11" fill="#f4f7fb" stroke="#e1e8f0"/>
+  <rect x="101" y="604" width="36" height="36" rx="9" fill="#dfeafa"/>
+  <text x="119" y="627" text-anchor="middle" class="label">GB</text>
+  <text x="153" y="615" class="label">LightGBM classifier</text>
+  <text x="153" y="638" class="body">Native categorical + engineered numeric features</text>
+  <text x="153" y="659" class="body">5-fold expanding-window TimeSeriesSplit + early stopping</text>
+  <rect x="153" y="672" width="176" height="21" rx="10" fill="#e7eef8"/>
+  <text x="241" y="686" text-anchor="middle" class="tiny">VALIDATION PROBABILITIES</text>
+
+  <rect x="660" y="400" width="880" height="332" rx="18" class="card"/>
+  <rect x="660" y="400" width="880" height="8" rx="4" fill="#7657a8"/>
+  <circle cx="690" cy="439" r="15" fill="#7657a8"/>
+  <text x="690" y="443" text-anchor="middle" class="section-no">04</text>
+  <text x="716" y="445" class="section">Fused multimodal neural network</text>
+  <text x="684" y="470" class="small">04_NN_sequence.ipynb  |  three representations, one fraud classifier</text>
+
+  <rect x="684" y="489" width="264" height="104" rx="11" fill="#f0f4fb" stroke="#dce6f3"/>
+  <rect x="700" y="505" width="7" height="70" rx="3" fill="#5076a5"/>
+  <text x="721" y="518" class="tiny">BRANCH A</text>
+  <text x="721" y="540" class="label">Static tabular</text>
+  <text x="721" y="560" class="small">Continuous inputs + categorical</text>
+  <text x="721" y="576" class="small">embedding tables → static MLP</text>
+
+  <rect x="968" y="489" width="264" height="104" rx="11" fill="#edf7f6" stroke="#d6ebe8"/>
+  <rect x="984" y="505" width="7" height="70" rx="3" fill="#148a8a"/>
+  <text x="1005" y="518" class="tiny">BRANCH B</text>
+  <text x="1005" y="540" class="label">User transaction history</text>
+  <text x="1005" y="560" class="small">Up to 15 prior events × 5 signals</text>
+  <text x="1005" y="576" class="small">Masked Transformer encoder</text>
+
+  <rect x="1252" y="489" width="264" height="104" rx="11" fill="#f6f1fa" stroke="#e9def2"/>
+  <rect x="1268" y="505" width="7" height="70" rx="3" fill="#9a70b6"/>
+  <text x="1289" y="518" class="tiny">BRANCH C</text>
+  <text x="1289" y="540" class="label">Device semantics</text>
+  <text x="1289" y="560" class="small">DeviceInfo → frozen</text>
+  <text x="1289" y="576" class="small">SentenceTransformer embedding</text>
+
+  <path d="M816 593 V609 H1100" class="line-plain"/>
+  <path d="M1100 593 V609" class="line-plain"/>
+  <path d="M1384 593 V609 H1100" class="line-plain"/>
+  <path d="M1100 609 V623" class="line-teal"/>
+  <rect x="881" y="625" width="438" height="54" rx="12" fill="#eaf5f4" stroke="#b9dfdc"/>
+  <text x="1100" y="648" text-anchor="middle" class="label">Concatenate representations → fusion classifier</text>
+  <text x="1100" y="667" text-anchor="middle" class="small">Single neural fraud-probability output</text>
+  <rect x="1030" y="691" width="140" height="22" rx="11" fill="#e8f3f2"/>
+  <text x="1100" y="706" text-anchor="middle" class="tiny" fill="#147b7b">VALIDATION SCORES</text>
+
+  <!-- Both model tracks feed the ensemble -->
+  <path d="M343 732 V775 H800" class="line-plain"/>
+  <path d="M1100 732 V775 H800" class="line-plain"/>
+  <path d="M800 775 V813" class="line-teal"/>
+  <path d="M343 732 V775 H35 V1108 H250" class="line-teal"/>
+  <rect x="48" y="788" width="190" height="25" rx="12" fill="#f4f7fb"/>
+  <text x="143" y="805" text-anchor="middle" class="tiny">LIGHTGBM MODEL ARTIFACT</text>
+
+  <rect x="250" y="825" width="1100" height="166" rx="18" class="card"/>
+  <rect x="250" y="825" width="1100" height="8" rx="4" fill="#d18a36"/>
+  <circle cx="282" cy="865" r="15" fill="#d18a36"/>
+  <text x="282" y="869" text-anchor="middle" class="section-no">05</text>
+  <text x="308" y="871" class="section">Rank-normalized ensemble &amp; evaluation</text>
+  <text x="274" y="895" class="small">05_ensemble_evaluation.ipynb  |  aligned chronological holdout predictions</text>
+
+  <rect x="274" y="913" width="218" height="53" rx="10" fill="#fbf5ec"/>
+  <text x="383" y="935" text-anchor="middle" class="label">Rank normalization</text>
+  <text x="383" y="953" text-anchor="middle" class="small">LGBM + NN scores</text>
+  <path d="M492 939 H530" class="line"/>
+  <rect x="540" y="913" width="218" height="53" rx="10" fill="#fbf5ec"/>
+  <text x="649" y="935" text-anchor="middle" class="label">Weight search</text>
+  <text x="649" y="953" text-anchor="middle" class="small">Optimize holdout ROC-AUC</text>
+  <path d="M758 939 H796" class="line"/>
+  <rect x="806" y="913" width="218" height="53" rx="10" fill="#fbf5ec"/>
+  <text x="915" y="935" text-anchor="middle" class="label">Selected blend</text>
+  <text x="915" y="953" text-anchor="middle" class="small">95% LightGBM + 5% NN</text>
+  <path d="M1024 939 H1062" class="line"/>
+  <rect x="1072" y="913" width="254" height="53" rx="10" fill="#fbf5ec"/>
+  <text x="1199" y="935" text-anchor="middle" class="label">Compare ROC-AUC / PR-AUC</text>
+  <text x="1199" y="953" text-anchor="middle" class="small">Against each standalone model</text>
+
+  <rect x="250" y="1035" width="1100" height="166" rx="18" class="card"/>
+  <rect x="250" y="1035" width="1100" height="8" rx="4" fill="#3c8b69"/>
+  <circle cx="282" cy="1075" r="15" fill="#3c8b69"/>
+  <text x="282" y="1079" text-anchor="middle" class="section-no">06</text>
+  <text x="308" y="1081" class="section">Streaming inference &amp; decisioning</text>
+  <text x="274" y="1105" class="small">06_test_inference.ipynb  |  chunked scoring with historical state and model-consistent features</text>
+
+  <rect x="274" y="1123" width="250" height="52" rx="10" fill="#eef6f1"/>
+  <text x="399" y="1145" text-anchor="middle" class="label">Incoming test transactions</text>
+  <text x="399" y="1163" text-anchor="middle" class="small">Feature parity + rolling state</text>
+  <path d="M524 1149 H567" class="line"/>
+  <rect x="577" y="1123" width="210" height="52" rx="10" fill="#eef6f1"/>
+  <text x="682" y="1145" text-anchor="middle" class="label">Risk probability</text>
+  <text x="682" y="1163" text-anchor="middle" class="small">Threshold-based routing</text>
+  <path d="M787 1149 H830" class="line"/>
+  <rect x="840" y="1123" width="285" height="52" rx="10" fill="#eef6f1"/>
+  <text x="982" y="1145" text-anchor="middle" class="label">Approve  |  Review  |  Decline</text>
+  <text x="982" y="1163" text-anchor="middle" class="small">Operational decision tiers</text>
+  <path d="M1125 1149 H1168" class="line"/>
+  <rect x="1178" y="1123" width="148" height="52" rx="10" fill="#eef6f1"/>
+  <text x="1252" y="1145" text-anchor="middle" class="label">MLflow</text>
+  <text x="1252" y="1163" text-anchor="middle" class="small">Track &amp; log</text>
+
+  <text x="64" y="1245" class="small">Serving uses the LightGBM model artifact; the rank blend is evaluated offline. CV and holdout metrics use different windows.</text>
+  <text x="1536" y="1245" text-anchor="end" class="tiny">IEEE-CIS FRAUD DETECTION</text>
+</svg>
