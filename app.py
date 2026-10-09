@@ -1,6 +1,8 @@
+import json
 from io import BytesIO
 from pathlib import Path
 
+import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -8,6 +10,8 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_PREDICTIONS = ROOT / "notebooks" / "reports" / "test_submission.csv"
+DEFAULT_POLICY = ROOT / "src" / "artifacts" / "thresholds.json"
+BUSINESS_IMPACT_PAGE = "Business impact - What-If sensitivity analysis simulator"
 MODEL_PIPELINE = ROOT / "modeling_pipeline_architecture.svg"
 INFERENCE_PIPELINE = ROOT / "inference_decisioning_flow.svg"
 SHAP_PLOT = ROOT / "assets" / "shap_summary.png"
@@ -107,6 +111,110 @@ def get_predictions(uploaded_file) -> pd.DataFrame | None:
     ) as error:
         st.error(f"Unable to load test predictions: {error}")
         return None
+
+
+@st.cache_data(show_spinner="Evaluating feasible threshold combinations...")
+def threshold_cost_surface(
+    probabilities: np.ndarray,
+    amounts: np.ndarray,
+    chargeback_fee: float,
+    review_cost: float,
+    churn_cost: float,
+    catch_rate: float,
+    max_review_rate: float,
+) -> pd.DataFrame:
+    expected_approve_cost = probabilities * (amounts + chargeback_fee)
+    expected_decline_cost = (1.0 - probabilities) * churn_cost
+    cannot_review = (amounts + chargeback_fee) <= review_cost
+    prefer_approve = expected_approve_cost <= expected_decline_cost
+    total_count = len(probabilities)
+    policies: list[dict[str, float]] = []
+
+    for approve_threshold in np.linspace(0.005, 0.2, 30):
+        approve_base = probabilities < approve_threshold
+        for decline_threshold in np.linspace(0.2, 0.45, 30):
+            if decline_threshold <= approve_threshold:
+                continue
+
+            decline_base = probabilities >= decline_threshold
+            review_base = (~approve_base) & (~decline_base)
+            review_bypass = review_base & cannot_review
+            review = review_base & ~cannot_review
+            approve = approve_base | (review_bypass & prefer_approve)
+            decline = decline_base | (review_bypass & ~prefer_approve)
+            review_rate = float(np.sum(review) / total_count)
+            approve_rate = float(np.sum(approve) / total_count)
+            if review_rate > max_review_rate or approve_rate < 0.85:
+                continue
+
+            fraud_loss = float(
+                np.sum(expected_approve_cost[approve])
+                + np.sum(
+                    probabilities[review]
+                    * (1.0 - catch_rate)
+                    * (amounts[review] + chargeback_fee)
+                )
+            )
+            review_staffing_cost = float(np.sum(review) * review_cost)
+            churn_friction_cost = float(np.sum(expected_decline_cost[decline]))
+            policies.append(
+                {
+                    "t_approve": float(approve_threshold),
+                    "t_decline": float(decline_threshold),
+                    "expected_fraud_loss": fraud_loss,
+                    "review_staffing_cost": review_staffing_cost,
+                    "churn_friction_cost": churn_friction_cost,
+                    "total_expected_cost": (
+                        fraud_loss + review_staffing_cost + churn_friction_cost
+                    ),
+                    "review_rate": review_rate,
+                    "approve_rate": approve_rate,
+                }
+            )
+    return pd.DataFrame(policies)
+
+
+def evaluate_policy(
+    probabilities: np.ndarray,
+    amounts: np.ndarray,
+    t_approve: float,
+    t_decline: float,
+    chargeback_fee: float,
+    review_cost: float,
+    churn_cost: float,
+    catch_rate: float,
+) -> tuple[dict[str, np.ndarray], dict[str, float]]:
+    approve = probabilities < t_approve
+    decline = probabilities >= t_decline
+    review = (~approve) & (~decline)
+
+    cannot_review = (amounts + chargeback_fee) <= review_cost
+    prefer_approve = (
+        probabilities * (amounts + chargeback_fee)
+        <= (1.0 - probabilities) * churn_cost
+    )
+    review_bypass = review & cannot_review
+    review &= ~cannot_review
+    approve |= review_bypass & prefer_approve
+    decline |= review_bypass & ~prefer_approve
+
+    masks = {"APPROVE": approve, "REVIEW": review, "DECLINE": decline}
+    residual_fraud_loss = float(
+        np.sum(probabilities[approve] * (amounts[approve] + chargeback_fee))
+        + np.sum(
+            probabilities[review]
+            * (1.0 - catch_rate)
+            * (amounts[review] + chargeback_fee)
+        )
+    )
+    staffing_cost = float(np.sum(review) * review_cost)
+    churn_friction = float(np.sum((1.0 - probabilities[decline]) * churn_cost))
+    costs = {
+        "Expected residual fraud loss": residual_fraud_loss,
+        "Review staffing OpEx": staffing_cost,
+        "Decline churn friction": churn_friction,
+    }
+    return masks, costs
 
 
 def show_summary() -> None:
@@ -286,15 +394,9 @@ def show_test_pipeline() -> pd.DataFrame | None:
 
 def show_business_impact() -> None:
     show_hero(
-        "Business impact",
-        "Explore how review and decline thresholds change estimated exposure and operating cost.",
+        BUSINESS_IMPACT_PAGE,
+        "Explore how review economics and queue capacity change the minimum-cost fraud decision policy.",
     )
-    st.caption(
-        "Starting policy from the report: review at 0.05, decline at 0.35; "
-        "manual review cost 2.50 and chargeback fee 15.00. Amounts and costs use "
-        "the transaction dataset's currency units."
-    )
-
     uploaded_file = st.file_uploader(
         "Optional: use a different scored test CSV",
         type=["csv"],
@@ -305,96 +407,230 @@ def show_business_impact() -> None:
     if frame is None:
         return
 
-    left, right = st.columns(2)
-    with left:
-        review_threshold = st.number_input(
-            "Review from probability",
-            min_value=0.0,
-            max_value=0.99,
-            value=0.05,
-            step=0.01,
-            format="%.2f",
-        )
-    with right:
-        decline_threshold = st.number_input(
-            "Decline from probability",
-            min_value=0.01,
-            max_value=1.0,
-            value=0.35,
-            step=0.01,
-            format="%.2f",
-        )
-    cost_left, cost_right = st.columns(2)
-    with cost_left:
-        review_cost = st.number_input(
-            "Cost per manual review",
-            min_value=0.0,
-            value=2.50,
-            step=0.50,
-        )
-    with cost_right:
-        chargeback_fee = st.number_input(
-            "Chargeback fee",
-            min_value=0.0,
-            value=15.00,
-            step=1.00,
-        )
+    probabilities = frame["isFraud"].to_numpy(dtype=np.float64)
+    amounts = frame["TransactionAmt"].to_numpy(dtype=np.float64)
+    chargeback_fee = st.session_state["chargeback_fee"]
+    review_cost = st.session_state["review_cost"]
+    churn_cost = st.session_state["churn_cost"]
+    catch_rate = st.session_state["catch_rate"] / 100.0
+    max_review_rate = st.session_state["max_review_rate"] / 100.0
 
-    if review_threshold >= decline_threshold:
-        st.warning("The decline threshold must be higher than the review threshold.")
+    cost_surface = threshold_cost_surface(
+        probabilities,
+        amounts,
+        chargeback_fee,
+        review_cost,
+        churn_cost,
+        catch_rate,
+        max_review_rate,
+    )
+    if cost_surface.empty:
+        st.warning(
+            "No feasible threshold pair was found for these assumptions. "
+            "The optimizer requires at least 85% auto-approval and enforces "
+            "the selected review-queue capacity."
+        )
         return
 
-    probabilities = frame["isFraud"].to_numpy()
-    amounts = frame["TransactionAmt"].to_numpy()
-    actions = np.select(
-        [
-            probabilities < review_threshold,
-            probabilities < decline_threshold,
-        ],
-        ["APPROVE", "REVIEW"],
-        default="DECLINE",
+    optimal_policy = cost_surface.nsmallest(1, "total_expected_cost").iloc[0]
+    t_approve = float(optimal_policy["t_approve"])
+    t_decline = float(optimal_policy["t_decline"])
+    masks, cost_breakdown = evaluate_policy(
+        probabilities,
+        amounts,
+        t_approve,
+        t_decline,
+        chargeback_fee,
+        review_cost,
+        churn_cost,
+        catch_rate,
     )
-    action_counts = pd.Series(actions).value_counts().reindex(
-        ["APPROVE", "REVIEW", "DECLINE"], fill_value=0
+    action_counts = pd.Series(
+        {action: int(np.sum(mask)) for action, mask in masks.items()}
     )
-    review_count = int(action_counts["REVIEW"])
-    decline_count = int(action_counts["DECLINE"])
-    approved_mask = actions == "APPROVE"
-    declined_mask = actions == "DECLINE"
-    expected_loss = float(
-        np.sum(probabilities[approved_mask] * (amounts[approved_mask] + chargeback_fee))
-    )
-    prevented_loss = float(
-        np.sum(probabilities[declined_mask] * (amounts[declined_mask] + chargeback_fee))
-    )
-    total_expected_fraud_cost = prevented_loss + expected_loss
-    prevented_share = (
-        prevented_loss / total_expected_fraud_cost if total_expected_fraud_cost else 0.0
-    )
-    review_spend = review_count * review_cost
+    review_count = action_counts["REVIEW"]
+    review_rate = review_count / len(frame)
+    total_expected_cost = float(optimal_policy["total_expected_cost"])
 
-    st.subheader("Estimated operating outcomes")
-    columns = st.columns(4)
+    st.caption(
+        "Each point is a feasible threshold pair from a 30×30 grid, subject to the "
+        "selected review-queue limit and a minimum 85% auto-approval rate. Costs are "
+        "estimated from predicted probabilities, not observed fraud outcomes; cost "
+        "inputs and transaction amounts are treated as euros."
+    )
+    st.subheader("Optimal thresholds for current assumptions")
+    columns = st.columns(3)
     columns[0].metric(
-        "Auto-approve",
-        f"{action_counts['APPROVE'] / len(frame):.2%}",
-        f"{action_counts['APPROVE']:,} transactions",
+        "Optimal approve threshold",
+        f"{t_approve:.4f}",
     )
     columns[1].metric(
-        "Manual review",
-        f"{review_count / len(frame):.2%}",
-        f"{review_count:,} · cost {review_spend:,.2f}",
+        "Optimal decline threshold",
+        f"{t_decline:.4f}",
     )
     columns[2].metric(
-        "Hard decline",
-        f"{decline_count / len(frame):.2%}",
-        f"{decline_count:,} transactions",
+        "Minimum expected portfolio cost",
+        f"€{total_expected_cost:,.2f}",
     )
-    columns[3].metric(
-        "Expected loss prevented",
-        f"{prevented_share:.1%}",
-        f"{prevented_loss:,.2f} probability-weighted",
+
+    st.subheader("Total cost by approve and decline thresholds")
+    chart_data = cost_surface.copy()
+    chart_data["is_optimal"] = (
+        (chart_data["t_approve"] == t_approve)
+        & (chart_data["t_decline"] == t_decline)
     )
+    chart_data["marker_size"] = np.where(chart_data["is_optimal"], 280, 55)
+    threshold_points = (
+        alt.Chart(chart_data)
+        .mark_circle(filled=True, opacity=0.8)
+        .encode(
+            x=alt.X(
+                "t_approve:Q",
+                title="Approve threshold (Tₐ)",
+                axis=alt.Axis(format=".2f"),
+            ),
+            y=alt.Y(
+                "t_decline:Q",
+                title="Decline threshold (Tᵈ)",
+                axis=alt.Axis(format=".2f"),
+            ),
+            color=alt.Color(
+                "total_expected_cost:Q",
+                title="Expected total cost (€)",
+                scale=alt.Scale(scheme="viridis"),
+            ),
+            size=alt.Size(
+                "marker_size:Q",
+                scale=alt.Scale(domain=[55, 280], range=[55, 280]),
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip("t_approve:Q", title="Approve threshold", format=".4f"),
+                alt.Tooltip("t_decline:Q", title="Decline threshold", format=".4f"),
+                alt.Tooltip(
+                    "total_expected_cost:Q",
+                    title="Total cost (€)",
+                    format=",.2f",
+                ),
+                alt.Tooltip(
+                    "expected_fraud_loss:Q",
+                    title="Fraud loss (€)",
+                    format=",.2f",
+                ),
+                alt.Tooltip(
+                    "review_staffing_cost:Q",
+                    title="Review OpEx (€)",
+                    format=",.2f",
+                ),
+                alt.Tooltip(
+                    "churn_friction_cost:Q",
+                    title="Churn friction (€)",
+                    format=",.2f",
+                ),
+            ],
+        )
+    )
+    optimal_point = (
+        alt.Chart(chart_data.loc[chart_data["is_optimal"]])
+        .mark_point(
+            shape="diamond",
+            filled=True,
+            color="#e63946",
+            size=220,
+            stroke="white",
+            strokeWidth=1.5,
+        )
+        .encode(
+            x="t_approve:Q",
+            y="t_decline:Q",
+            tooltip=[
+                alt.Tooltip("t_approve:Q", title="Optimal approve threshold", format=".4f"),
+                alt.Tooltip("t_decline:Q", title="Optimal decline threshold", format=".4f"),
+                alt.Tooltip(
+                    "total_expected_cost:Q",
+                    title="Minimum expected total cost (€)",
+                    format=",.2f",
+                ),
+            ],
+        )
+    )
+    optimal_label = (
+        alt.Chart(chart_data.loc[chart_data["is_optimal"]])
+        .mark_text(align="left", dx=10, dy=-10, color="#b42332")
+        .encode(
+            x="t_approve:Q",
+            y="t_decline:Q",
+            text=alt.value("Optimal"),
+        )
+    )
+    st.altair_chart(
+        alt.layer(threshold_points, optimal_point, optimal_label).properties(
+            height=440
+        ),
+        width="stretch",
+    )
+
+    st.subheader("Minimum-cost breakdown")
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Cost component": [
+                    "Expected fraud loss",
+                    "Review staffing OpEx",
+                    "Decline churn friction",
+                ],
+                "Expected cost (€)": [
+                    cost_breakdown["Expected residual fraud loss"],
+                    cost_breakdown["Review staffing OpEx"],
+                    cost_breakdown["Decline churn friction"],
+                ],
+            }
+        ).style.format({"Expected cost (€)": "€{:,.2f}"}),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.subheader("Review-queue breakeven boundary")
+    review_band = (probabilities >= t_approve) & (probabilities < t_decline)
+    breakeven_bypass = review_band & (
+        (amounts + chargeback_fee) <= review_cost
+    )
+    queue_columns = st.columns(3)
+    queue_columns[0].metric(
+        "Review-band candidates",
+        f"{int(np.sum(review_band)):,}",
+    )
+    queue_columns[1].metric(
+        "Routed to reviewers",
+        f"{review_count:,}",
+        f"{review_rate:.2%} of batch",
+    )
+    queue_columns[2].metric(
+        "Breakeven bypass",
+        f"{int(np.sum(breakeven_bypass)):,}",
+        "Automatically approved or declined",
+    )
+    st.write(
+        f"Scores from **{t_approve:.4f}** up to (but not including) "
+        f"**{t_decline:.4f}** form the review band. The optimizer holds the queue "
+        f"to **{review_rate:.2%}**, below the **{max_review_rate:.2%}** capacity "
+        f"limit. Low-value transactions where review cost exceeds transaction "
+        f"amount plus chargeback fee bypass review and are assigned to the cheaper "
+        f"approve/decline action; transactions outside the band are auto-routed by "
+        f"their score thresholds."
+    )
+    bin_edges = np.linspace(0.0, 1.0, 21)
+    histogram = {
+        action: np.histogram(probabilities[mask], bins=bin_edges)[0]
+        for action, mask in masks.items()
+    }
+    probability_bands = [
+        f"{lower:.2f}–{upper:.2f}"
+        for lower, upper in zip(bin_edges[:-1], bin_edges[1:])
+    ]
+    chart_data = pd.DataFrame(histogram, index=probability_bands)
+    chart_data.index.name = "Fraud-probability band"
+    st.bar_chart(chart_data, stack=True)
 
     outcome_data = pd.DataFrame(
         {
@@ -402,29 +638,13 @@ def show_business_impact() -> None:
             "Share": action_counts / len(frame),
         }
     )
-    chart_data = outcome_data.rename_axis("Decision").reset_index()
-    st.bar_chart(chart_data, x="Decision", y="Share")
-    st.markdown(
-        f"""
-        - **Expected fraud exposure in auto-approved transactions:** {expected_loss:,.2f}
-        - **Probability-weighted loss for declined transactions:** {prevented_loss:,.2f}
-        - **Manual-review operating cost:** {review_spend:,.2f}
-
-        These are model-based estimates: the saved test output has no observed
-        fraud labels. Review outcomes are not counted as prevented loss here.
-        """
-    )
     st.dataframe(
         outcome_data.style.format({"Share": "{:.2%}"}),
         width="stretch",
     )
-
-    st.subheader("Business recommendations")
-    st.write(
-        "Use threshold tuning as a cost-policy decision, not a model-score exercise "
-        "alone. Calibrate against chargeback loss, review capacity, and the cost of "
-        "rejecting legitimate customers; consider a minimum transaction amount "
-        "for manual review."
+    st.info(
+        "This is a what-if estimate, not a realized savings forecast. Validate the "
+        "assumptions and currency alignment before operational use."
     )
 
 
@@ -436,11 +656,56 @@ with st.sidebar:
             "Executive summary",
             "Model & SHAP",
             "Testing pipeline",
-            "Business impact",
+            BUSINESS_IMPACT_PAGE,
         ],
         label_visibility="collapsed",
     )
     st.markdown("---")
+    if page == BUSINESS_IMPACT_PAGE:
+        policy = json.loads(DEFAULT_POLICY.read_text(encoding="utf-8"))
+        economics = policy["economics"]
+        st.subheader("What-if assumptions")
+        st.slider(
+            "Audit Cost per Review (€)",
+            min_value=0.5,
+            max_value=100.5,
+            value=float(economics["manual_review_cost"]),
+            step=1.0,
+            key="review_cost",
+        )
+        st.slider(
+            "Chargeback Fee (€)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(economics["chargeback_fee"]),
+            step=1.0,
+            key="chargeback_fee",
+        )
+        st.slider(
+            "Customer Insult / Churn Cost (€)",
+            min_value=0.0,
+            max_value=500.0,
+            value=10.0,
+            step=1.0,
+            key="churn_cost",
+        )
+        st.slider(
+            "Human Reviewer Catch Rate (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(economics["human_catch_rate"]) * 100.0,
+            step=1.0,
+            key="catch_rate",
+        )
+        st.slider(
+            "Max Review Queue Capacity (%)",
+            min_value=0.0,
+            max_value=25.0,
+            value=8.0,
+            step=1.0,
+            key="max_review_rate",
+        )
+        st.caption("The optimizer also enforces a minimum 85% auto-approval rate.")
     st.caption("IEEE-CIS fraud detection report")
 
 if page == "Executive summary":

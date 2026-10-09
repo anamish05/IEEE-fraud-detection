@@ -1,13 +1,12 @@
 {
-  "policy_name": "balanced_cost_minimization_v1",
-  "version": "1.0",
-  "thresholds": {
-    "t_review": 0.05,
-    "t_decline": 0.35
-  },
-  "economics": {
-    "chargeback_fee": 15.0,
-    "manual_review_cost": 2.5,
-    "max_monthly_review_capacity": 5000
-  }
+    "thresholds": {
+        "t_approve": 0.03862068965517241,
+        "t_decline": 0.24310344827586208
+    },
+    "economics": {
+        "chargeback_fee": 15.0,
+        "manual_review_cost": 2.5,
+        "churn_cost": 10.0,
+        "human_catch_rate": 0.9
+    }
 }

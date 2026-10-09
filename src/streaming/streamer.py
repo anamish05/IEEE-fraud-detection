@@ -61,20 +61,21 @@ class TransactionStreamer:
 
         if thresholds_path:
             with open(thresholds_path, 'r') as f:
-                self.policy = json.load(f)
+                data = json.load(f)
+            if "thresholds" in data:
+                self.policy = {**data, **data['thresholds']}
+            else:
+                self.policy=data
         else:
-            self.policy={'t_review':0.05, 't_decline':0.35, 'manual_review_cost':2.50, 'chargeback_fee': 15.00}
+            self.policy={'t_approve':0.05, 't_decline':0.35, "economics": {"chargeback_fee": 15.0,"manual_review_cost": 2.50,"churn_cost": 10.0,"human_catch_rate": 0.90}}
 
     def run_inference(self, test_trans_path: str, test_ident_path: str, output_csv: str, chunk_size: int = 50000):
-
 
         with mlflow.start_run(run_name="streaming-inference"):
             mlflow.log_params({
                 "chunk_size": chunk_size,
                 "feature_count": len(self.model_features)
             })
-
-
 
 
             # Create stream view
@@ -102,6 +103,16 @@ class TransactionStreamer:
 
             predictions, tx_ids, actions = [], [], []
             transaction_amounts= []
+
+            # Extract thresholds safely (works whether nested or flat)
+            t_approve = (
+                self.policy.get("thresholds", {}).get("t_approve")
+                or self.policy.get("t_approve", 0.05)
+            )
+            t_decline = (
+                self.policy.get("thresholds", {}).get("t_decline")
+                or self.policy.get("t_decline", 0.35)
+            )
 
             while True:
                 chunk_df = cursor.fetch_df_chunk(chunk_size)
@@ -195,7 +206,7 @@ class TransactionStreamer:
 
                 preds = self.model.predict(X_chunk)
 
-                conditions = [preds < self.policy['t_review'], (preds >= self.policy['t_review'])&(preds < self.policy['t_decline']), preds >= self.policy['t_decline'] ]
+                conditions = [preds < t_approve, (preds >= t_approve)&(preds < t_decline), preds >= t_decline] 
 
                 choices=['APPROVE', 'REVIEW', 'DECLINE']
                 batch_actions=np.select(conditions, choices, default='REVIEW')
@@ -231,36 +242,88 @@ class TransactionStreamer:
             sub_df.to_csv(output_csv, index=False)
             print(f"Inference complete: output saved to {output_csv}")
 
+            # BUSINESS IMPACT
             # Economic parameters from policy (with fallbacks)
-            cb_fee = self.policy.get("economics", {}).get("chargeback_fee", 15.0)
-            review_cost = self.policy.get("economics", {}).get("manual_review_cost", 2.50)
+            econ = self.policy.get("economics", {})
+            cb_fee = econ.get("chargeback_fee", 15.0)
+            review_cost = econ.get("manual_review_cost", 2.50)
+            churn_cost = econ.get("churn_cost", 10.0)
+            catch_human = econ.get("human_catch_rate", 0.90)
 
+            p = np.asarray(predictions)
+            amt = np.asarray(transaction_amounts)
+
+            # cost business rules (vectorized)
+            e_cost_app = p * (amt + cb_fee)
+            e_cost_dec = (1.0 - p) * churn_cost
+
+
+            is_approve = p < t_approve
+            is_decline = p >= t_decline
+            is_review = (~is_approve) & (~is_decline)
+
+            # breakeven rule for manual review
+            cannot_review = (amt+cb_fee) <= review_cost
+            prefer_app_over_dec = e_cost_app<=e_cost_dec
+
+            review_bypass = is_review & cannot_review  # for review, but econoically too cheap to review
+            is_review = is_review & (~cannot_review)   # for review, excluding bypass transactions
+            is_approve = is_approve | (review_bypass & prefer_app_over_dec)   # if approve is cheaper than decline for bypass transaction - approve it
+            is_decline = is_decline | (review_bypass & (~prefer_app_over_dec))  # else - decline it
+
+            # Assign Decision Labels
+            actions = np.empty(len(p), dtype=object)
+            actions[is_approve] = "APPROVE"
+            actions[is_review] = "REVIEW"
+            actions[is_decline] = "DECLINE"
+
+            # Save Submissions CSV
+            sub_df = pd.DataFrame({
+                "TransactionID": tx_ids,
+                "isFraud": p,
+                "decision": actions,
+                "TransactionAmt": amt
+            })
+            sub_df.to_csv(output_csv, index=False)
+            print(f"Inference complete: output saved to {output_csv}")
+
+
+            # Financial & Operational Metrics
             total_tx = len(sub_df)
-            action_counts = sub_df["decision"].value_counts().to_dict()
-           
-            n_approved = action_counts.get("APPROVE", 0)
-            n_reviewed = action_counts.get("REVIEW", 0)
-            n_declined = action_counts.get("DECLINE", 0)
+            n_approved = int(np.sum(is_approve))
+            n_reviewed = int(np.sum(is_review))
+            n_declined = int(np.sum(is_decline))
 
-            # Operational queue cost incurred by staff
+            # Manual review queue operational expenditure
             total_review_expense = n_reviewed * review_cost
-            # Expected Chargeback Exposure = sum of P(fraud) * (Amt + dispute_fee)
-            sub_df["expected_cb_loss"] = sub_df["isFraud"] * (sub_df["TransactionAmt"] + cb_fee)
 
-            expected_approved_loss = sub_df.loc[sub_df["decision"] == "APPROVE", "expected_cb_loss"].sum()
-            prevented_fraud_exposure = sub_df.loc[sub_df["decision"] == "DECLINE", "expected_cb_loss"].sum()
+            # Capital prevented by automated decline
+            prevented_fraud_exposure = float(np.sum(p[is_decline] * (amt[is_decline] + cb_fee)))
 
+            # Residual expected fraud loss (approved transactions + missed by reviewers)
+            approved_fraud_loss = float(np.sum(e_cost_app[is_approve]))
+            reviewed_fraud_leakage = float(np.sum(p[is_review] * (1.0 - catch_human) * (amt[is_review] + cb_fee)))
+            total_expected_fraud_loss = approved_fraud_loss + reviewed_fraud_leakage
+
+            # Customer lifetime value lost from false declines (insult cost)
+            total_churn_loss = float(np.sum(e_cost_dec[is_decline]))
+
+            # Total economic portfolio loss under this policy
+            total_portfolio_cost = total_expected_fraud_loss + total_review_expense + total_churn_loss
 
             summary_metrics = {
-            "total_transactions": total_tx,
-            "auto_approve_rate": n_approved / total_tx,
-            "manual_review_rate": n_reviewed / total_tx,
-            "hard_decline_rate": n_declined / total_tx,
-            "total_euros_declined": float(sub_df.loc[sub_df["decision"] == "DECLINE", "TransactionAmt"].sum()),
-            "total_euros_routed_to_review": float(sub_df.loc[sub_df["decision"] == "REVIEW", "TransactionAmt"].sum()),
-            "manual_review_operational_cost": float(total_review_expense),
-            "expected_fraud_loss": float(expected_approved_loss),
-            "prevented_fraud_loss": float(prevented_fraud_exposure),
+                "total_transactions": total_tx,
+                "auto_approve_rate": n_approved / total_tx,
+                "manual_review_rate": n_reviewed / total_tx,
+                "hard_decline_rate": n_declined / total_tx,
+                "total_euros_declined": float(np.sum(amt[is_decline])),
+                "total_euros_routed_to_review": float(np.sum(amt[is_review])),
+                "manual_review_operational_cost": float(total_review_expense),
+                "prevented_fraud_loss": float(prevented_fraud_exposure),
+                "expected_fraud_loss": float(total_expected_fraud_loss),
+                "churn_friction_loss": float(total_churn_loss),
+                "total_portfolio_cost": float(total_portfolio_cost),
+                "policy_roi_per_review_euro": (prevented_fraud_exposure / total_review_expense) if total_review_expense > 0 else 0.0
             }
 
             print("\n=== BUSINESS DECISION SUMMARY ===")
@@ -274,7 +337,6 @@ class TransactionStreamer:
                 "fraud_rate": float(sub_df["isFraud"].mean())
             })
             mlflow.log_metrics(summary_metrics)
-            #mlflow.log_artifact("artifacts/thresholds.json")
 
 
 
