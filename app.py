@@ -10,7 +10,7 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parent
 DEFAULT_PREDICTIONS = ROOT / "notebooks" / "reports" / "test_submission.csv"
 DEFAULT_POLICY = ROOT / "src" / "artifacts" / "thresholds.json"
-BUSINESS_IMPACT_PAGE = "Business impact - Sensitivity analysis"
+BUSINESS_IMPACT_PAGE = "Fraud policy simulator"
 MODEL_PIPELINE = ROOT / "modeling_pipeline_architecture.svg"
 INFERENCE_PIPELINE = ROOT / "inference_decisioning_flow.svg"
 SHAP_PLOT = ROOT / "assets" / "shap_summary.png"
@@ -18,7 +18,7 @@ PREDICTION_COLUMNS = ["TransactionID", "isFraud", "decision", "TransactionAmt"]
 MIN_DECLINE_PROBABILITY = 0.25
 
 st.set_page_config(
-    page_title="Vesta | Fraud Decisioning",
+    page_title="Vesta IEEE-CIS | Fraud Decisioning",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -754,60 +754,65 @@ def show_business_impact() -> None:
         "The axis is zoomed in to show the shape."
     )
 
-    with st.expander("📘 How does this simulator work?", expanded=False):
-        st.markdown(
-            """
-            **The model gives each transaction a fraud probability *p*.** The simulator
-            chooses the action with the lowest *expected cost* (Bayes decision theory).
-            With exposure **F = amount + chargeback fee**:
-
-            | Action | Expected cost | Meaning |
-            |---|---|---|
-            | ✅ Approve | p × F | If it is fraud, we lose the amount and the fee |
-            | 🔍 Review | audit cost + p × (1 − catch rate) × F | We always pay the audit; fraud is lost only if the reviewer misses it |
-            | ⛔ Decline | (1 − p) × churn cost | If it is legitimate, we lose a customer |
-
-            **Break-even probabilities** (where two actions cost the same):
-            - Approve → Review at **p = audit cost / (catch rate × F)**
-            - Review → Decline at **p = (churn − audit) / (churn + (1 − catch rate) × F)**
-
-            The two sliders for *P of approve* / *P of decline* are global guardrails.
-            Transactions in the review band are routed straight to approve or decline when
-            that is cheaper. The **◆** marks the cheapest threshold that keeps the review
-            queue within capacity.
-
-            **Try this:** raise *churn cost* (fewer declines), raise *audit cost* (smaller
-            review band), lower *queue capacity* (forces more automatic decisions).
-            Costs are computed from predicted probabilities, not observed fraud labels.
-            """
-        )
-        ex_amt = st.number_input(
-            "Example transaction amount (€)",
-            min_value=1.0, max_value=5000.0,
-            value=float(np.median(amounts)), step=10.0,
-        )
-        F = ex_amt + chargeback_fee
-        p_ad = churn_cost / (F + churn_cost)
-        p_a = review_cost / (catch_rate * F) if catch_rate > 0 else float("inf")
-        p_d = (churn_cost - review_cost) / (churn_cost + (1 - catch_rate) * F)
-        if p_a < p_d:
-            st.info(
-                f"For a €{ex_amt:,.0f} transaction: approve if p < **{p_a:.3f}**, "
-                f"review between **{p_a:.3f}** and **{p_d:.3f}**, decline above **{p_d:.3f}**."
-            )
-        else:
-            st.info(
-                f"For a €{ex_amt:,.0f} transaction review never pays off with these "
-                f"costs: approve if p < **{p_ad:.3f}**, otherwise decline."
-            )
-
-    st.subheader("Dual-Threshold Cost Optimization (6 months test dataset)")
+    
+    st.subheader("Finding the cheapest Approve / Decline thresholds (6-month test set)")
     st.markdown(
+        f'<p class="chart-explanation">Each transaction is approved, reviewed or declined, '
+        f'whichever has the lowest expected cost (Bayes decision theory). '
         f'<p class="chart-explanation">This chart sweeps {sweep_threshold} while holding the other threshold '
         "fixed, and finds the minimum expected total cost under the selected "
         'business constraints. The diamond marks the lowest-cost feasible point.</p>',
         unsafe_allow_html=True,
     )
+
+    with st.expander("📘 How does this simulator work?", expanded=False):
+            st.markdown(
+                """
+                **The model gives each transaction a fraud probability *p*.** The simulator
+                chooses the action with the lowest *expected cost* (Bayes decision theory).
+                With exposure **F = amount + chargeback fee**:
+    
+                | Action | Expected cost | Meaning |
+                |---|---|---|
+                | ✅ Approve | p × F | If it is fraud, we lose the amount and the fee |
+                | 🔍 Review | audit cost + p × (1 − catch rate) × F | We always pay the audit; fraud is lost only if the reviewer misses it |
+                | ⛔ Decline | (1 − p) × churn cost | If it is legitimate, we lose a customer |
+    
+                **Break-even probabilities** (where two actions cost the same):
+                - Approve → Review at **p = audit cost / (catch rate × F)**
+                - Review → Decline at **p = (churn − audit) / (churn + (1 − catch rate) × F)**
+    
+                The two sliders for *P of approve* / *P of decline* are global guardrails.
+                Transactions in the review band are routed straight to approve or decline when
+                that is cheaper. The **◆** marks the cheapest threshold that keeps the review
+                queue within capacity.
+    
+                **Try this:** raise *churn cost* (fewer declines), raise *audit cost* (smaller
+                review band), lower *queue capacity* (forces more automatic decisions).
+                Costs are computed from predicted probabilities, not observed fraud labels.
+                """
+            )
+            ex_amt = st.number_input(
+                "Example transaction amount (€)",
+                min_value=1.0, max_value=5000.0,
+                value=float(np.median(amounts)), step=10.0,
+            )
+            F = ex_amt + chargeback_fee
+            p_ad = churn_cost / (F + churn_cost)
+            p_a = review_cost / (catch_rate * F) if catch_rate > 0 else float("inf")
+            p_d = (churn_cost - review_cost) / (churn_cost + (1 - catch_rate) * F)
+            if p_a < p_d:
+                st.info(
+                    f"For a €{ex_amt:,.0f} transaction: approve if p < **{p_a:.3f}**, "
+                    f"review between **{p_a:.3f}** and **{p_d:.3f}**, decline above **{p_d:.3f}**."
+                )
+            else:
+                st.info(
+                    f"For a €{ex_amt:,.0f} transaction review never pays off with these "
+                    f"costs: approve if p < **{p_ad:.3f}**, otherwise decline."
+                )
+    
+
     if optimal_policy is not None:
         summary_columns = st.columns(3)
         summary_columns[0].metric(
