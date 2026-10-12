@@ -100,7 +100,7 @@ The evaluation uses ROC-AUC and PR-AUC, which are useful for imbalanced datasets
    email domain. This allows user-level cumulative and rolling spend and
    transaction velocity to be measured:
 
-   > $$\text{Pseudo\_UID} = \text{card1} \parallel \text{card2} \parallel \text{card3} \parallel \text{card4} \parallel \text{card5} \parallel \text{card6} \parallel \text{addr1} \parallel \text{email domain} \parallel \text{Card birthday}$$
+   > $$\text{Pseudo_UID} = \text{card1} \parallel \text{card2} \parallel \text{card3} \parallel \text{card4} \parallel \text{card5} \parallel \text{card6} \parallel \text{addr1} \parallel \text{email domain} \parallel \text{Card birthday}$$
 
 5. **Rolling statistics for a 24-hour user window.** Sudden fraud spikes and
    deviations from a user's average transaction frequency are useful
@@ -132,11 +132,11 @@ The evaluation uses ROC-AUC and PR-AUC, which are useful for imbalanced datasets
 
 | Model / evaluation | ROC-AUC | PR-AUC |
 |---|---:|---:|
-| Logistic regression — expanding-window | 0.82788 | 0.39200 |
-| LightGBM — expanding-window | 0.91670 | 0.59896 |
-| LightGBM — chronological 80/20 | 0.94272 | 0.66854 |
-| Neural network — chronological 80/20 | 0.88958 | 0.50286 |
-| Rank blend (95% LightGBM / 5% NN) — chronological 80/20 | 0.94293 | 0.66185 |
+| Logistic regression - expanding-window | 0.82788 | 0.39200 |
+| LightGBM - expanding-window | 0.91670 | 0.59896 |
+| LightGBM - chronological 80/20 | 0.94272 | 0.66854 |
+| Neural network - chronological 80/20 | 0.88958 | 0.50286 |
+| Rank blend (95% LightGBM / 5% NN) - chronological 80/20 | 0.94293 | 0.66185 |
 
 #### Takeaways
 
@@ -183,16 +183,16 @@ $p = P(\text{fraud} \mid x)$. Bayes decision theory chooses the action with the
 **lowest posterior expected cost** for each transaction. The model estimates;
 the cost structure decides.
 
-Notation: $A$ = transaction amount, $F = A + \text{Fee}_{\text{cb}}$ =
-exposure if fraud gets through, $C_{\text{audit}}$ = cost per manual review,
-$c$ = human catch rate (recall), and $C_{\text{churn}}$ = cost of wrongly
+Notation: *$A$* = transaction amount, *$$F = A + \text{Fee}_{\text{cb}}$$* =
+exposure if fraud gets through, *$$C_{\text{audit}}$$* = cost per manual review,
+*$c$* = human catch rate (recall), and *$$C_{\text{churn}}$$* = cost of wrongly
 declining a legitimate customer.
 
 | Action | Expected cost | Interpretation |
 | :--- | :--- | :--- |
-| Approve | $E[\text{Cost}_{\text{Approve}}] = p \cdot F$ | If fraud, lose the amount plus chargeback fee; if legitimate, cost is 0. |
-| Review | $E[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p\,(1-c)\,F$ | Always pay the audit; fraud is lost only if the reviewer misses it. |
-| Decline | $E[\text{Cost}_{\text{Decline}}] = (1-p)\cdot C_{\text{churn}}$ | If legitimate, lose a customer; if fraud, cost is 0. |
+| Approve |$$E[\text{Cost}_{\text{Approve}}] = p \cdot F$$ | If fraud, lose the amount plus chargeback fee; if legitimate, cost is 0. |
+| Review |$$E[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p\,(1-c)\,F$$ | Always pay the audit; fraud is lost only if the reviewer misses it. |
+| Decline |$$E[\text{Cost}_{\text{Decline}}] = (1-p)\cdot C_{\text{churn}}$$ | If legitimate, lose a customer; if fraud, cost is 0. |
 
 An action is selected only if its expected cost is strictly lower than the
 expected cost of the alternatives.
@@ -201,26 +201,26 @@ expected cost of the alternatives.
 
 1. **Auto-approve**
 
-   $$E[\text{Cost}_{\text{Approve}}] = p \cdot (A + \text{Fee}_{\text{cb}})$$
+  $$E[\text{Cost}_{\text{Approve}}] = p \cdot (A + \text{Fee}_{\text{cb}})$$
 
-   If the transaction is fraudulent, the loss is the amount plus chargeback
-   fee; if legitimate, the cost is €0.
+  If the transaction is fraudulent, the loss is the amount plus chargeback
+  fee; if legitimate, the cost is €0.
 
 2. **Auto-decline**
 
-   $$E[\text{Cost}_{\text{Decline}}] = (1 - p) \cdot \text{Cost}_{\text{churn}}$$
+  $$E[\text{Cost}_{\text{Decline}}] = (1 - p) \cdot \text{Cost}_{\text{churn}}$$
 
-   If the transaction is legitimate, the business loses the customer and
-   lifetime value; if fraudulent, the cost is €0.
+  If the transaction is legitimate, the business loses the customer and
+  lifetime value; if fraudulent, the cost is €0.
 
 3. **Manual review**
 
-   $$E[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p \cdot (1 - \text{CatchRate}_{\text{human}}) \cdot (A + \text{Fee}_{\text{cb}})$$
+  $$E[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p \cdot (1 - \text{CatchRate}_{\text{human}}) \cdot (A + \text{Fee}_{\text{cb}})$$
 
-   The audit cost is always paid, plus residual fraud loss if the human
-   reviewer misses the fraud.
+  The audit cost is always paid, plus residual fraud loss if the human
+  reviewer misses the fraud.
 
-**Breakeven rule:** When $(A + \text{Fee}_{\text{cb}}) \le C_{\text{audit}}$,
+**Breakeven rule:** When $$(A + \text{Fee}_{\text{cb}}) \le C_{\text{audit}}$$,
 bypass manual review because inspecting costs more than the total exposure.
 Route directly to approve or decline, whichever has lower expected cost.
 
@@ -249,8 +249,7 @@ $$\min_{T_{\text{approve}}, T_{\text{decline}}} \sum_{i} \Big( E[\text{Cost}_{\t
   **Human recall:** 90%
 - **Chargeback fee ($\text{Fee}_{\text{cb}}$):** €15.00 per incident |
   **Customer churn cost:** €10.00
-- **Breakeven gating rule:** When $(A + \text{Fee}_{\text{cb}}) \le
-  C_{\text{audit}}$, manual review is bypassed because inspecting costs more
+- **Breakeven gating rule:** When $$(A + \text{Fee}_{\text{cb}}) \le C_{\text{audit}}$$, manual review is bypassed because inspecting costs more
   than the total exposure. Transactions are routed directly to Approve or
   Decline based on expected loss. The capacity constraint also matters:
   without it, the Bayes rule would send every transaction with $p$ above the
