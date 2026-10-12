@@ -406,7 +406,7 @@ def show_test_pipeline() -> None:
 
 def show_business_impact() -> None:
     show_hero(
-        "Fraud Policy Simulator: What If Costs Change?",
+        "Fraud policy simulator: What if costs change?",
         "Change the cost of fraud, manual review and customer churn, and see how the optimal approve / review / decline thresholds, review queue and total cost respond.",
     )
     policy = json.loads(DEFAULT_POLICY.read_text(encoding="utf-8"))
@@ -560,18 +560,18 @@ def show_business_impact() -> None:
         )
         infeasible_bands.append(
             {
-                "x_start": max(previous_midpoint, x_domain_min),
+                x_column: max(previous_midpoint, x_domain_min),
                 "x_end": min(next_midpoint, x_domain_max),
             }
         )
     infeasible_data = pd.DataFrame(
-        infeasible_bands, columns=["x_start", "x_end"]
+        infeasible_bands, columns=[x_column, "x_end"]
     )
     infeasible_region = (
         alt.Chart(infeasible_data)
         .mark_rect(color="#888", opacity=0.12)
         .encode(
-            x=alt.X("x_start:Q", scale=x_scale, axis=None),
+            x=x_encoding,
             x2="x_end:Q",
         )
     )
@@ -615,9 +615,7 @@ def show_business_impact() -> None:
         optimum_rule = (
             alt.Chart(pd.DataFrame({x_column: [optimal_x]}))
             .mark_rule(strokeDash=[4, 4], color="#3182f6")
-            .encode(
-                x=alt.X(f"{x_column}:Q", scale=x_scale, axis=None)
-            )
+            .encode(x=x_encoding)
         )
         optimal_point = (
             alt.Chart(
@@ -634,7 +632,7 @@ def show_business_impact() -> None:
                 strokeWidth=1.5,
             )
             .encode(
-                x=alt.X(f"{x_column}:Q", scale=x_scale, axis=None),
+                x=x_encoding,
                 y="total_cost:Q",
                 tooltip=[
                     alt.Tooltip(
@@ -653,14 +651,17 @@ def show_business_impact() -> None:
         total_layers.extend([optimum_rule, optimal_point])
     if not infeasible_data.empty:
         widest_band = max(
-            infeasible_bands, key=lambda band: band["x_end"] - band["x_start"]
+            infeasible_bands,
+            key=lambda band: band["x_end"] - band[x_column],
         )
         capacity_label = (
             alt.Chart(
                 pd.DataFrame(
                     [
                         {
-                            x_column: (widest_band["x_start"] + widest_band["x_end"]) / 2,
+                            x_column: (
+                                widest_band[x_column] + widest_band["x_end"]
+                            ) / 2,
                             "label_y": total_cost_max + total_cost_padding * 0.7,
                         }
                     ]
@@ -668,7 +669,7 @@ def show_business_impact() -> None:
             )
             .mark_text(color="#666", fontSize=11, text="Exceeds review capacity")
             .encode(
-                x=alt.X(f"{x_column}:Q", scale=x_scale, axis=None),
+                x=x_encoding,
                 y=alt.Y(
                     "label_y:Q",
                     scale=alt.Scale(
@@ -695,7 +696,16 @@ def show_business_impact() -> None:
         component_frame = component_data.loc[
             component_data["Cost type"] == component_name
         ]
-        panel_x = x_encoding if component_name == "Churn Cost" else x_encoding.axis(None)
+        panel_x = (
+            x_encoding
+            if component_name == "Churn Cost"
+            else alt.X(
+                f"{x_column}:Q",
+                title=x_title,
+                scale=x_scale,
+                axis=None,
+            )
+        )
         component_line = (
             alt.Chart(component_frame)
             .mark_line(
@@ -722,10 +732,21 @@ def show_business_impact() -> None:
         )
         panel_layers = []
         if not infeasible_data.empty:
-            panel_layers.append(infeasible_region)
+            panel_layers.append(
+                alt.Chart(infeasible_data)
+                .mark_rect(color="#888", opacity=0.12)
+                .encode(
+                    x=panel_x,
+                    x2="x_end:Q",
+                )
+            )
         panel_layers.append(component_line)
         if optimal_policy is not None:
-            panel_layers.append(optimum_rule)
+            panel_layers.append(
+                alt.Chart(pd.DataFrame({x_column: [optimal_x]}))
+                .mark_rule(strokeDash=[4, 4], color="#3182f6")
+                .encode(x=panel_x)
+            )
         panels.append(
             alt.layer(*panel_layers).properties(
                 title=f"{component_name} (€)",
@@ -1065,7 +1086,7 @@ def show_business_impact() -> None:
 
 
 with st.sidebar:
-    st.title("Fraud Policy Simulator")
+    st.title("Vesta IEEE-CIS | Fraud Decisioning")
     page = st.radio(
         "Report sections",
         [
