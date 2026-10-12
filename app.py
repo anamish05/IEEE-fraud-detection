@@ -18,7 +18,7 @@ PREDICTION_COLUMNS = ["TransactionID", "isFraud", "decision", "TransactionAmt"]
 MIN_DECLINE_PROBABILITY = 0.25
 
 st.set_page_config(
-    page_title="Vesta IEEE-CIS | Fraud Decisioning",
+    page_title="Vesta IEEE-CIS (Kaggle)| Fraud Decisioning",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -1099,7 +1099,10 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     st.markdown("---")
-    st.caption("IEEE-CIS fraud detection report")
+    st.markdown(
+        '<p>Competition source: <a href="https://www.kaggle.com/competitions/ieee-fraud-detection" target="_blank" rel="noopener noreferrer">Kaggle</a></p>',
+        unsafe_allow_html=True,
+    )
 
 if page == "Business problem and model pipeline":
     show_summary()
