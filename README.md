@@ -100,7 +100,7 @@ The evaluation uses ROC-AUC and PR-AUC, which are useful for imbalanced datasets
    email domain. This allows user-level cumulative and rolling spend and
    transaction velocity to be measured:
 
-   > $$\text{Pseudo_UID} = \text{card1} \parallel \text{card2} \parallel \text{card3} \parallel \text{card4} \parallel \text{card5} \parallel \text{card6} \parallel \text{addr1} \parallel \text{email domain} \parallel \text{Card birthday}$$
+   > $$\text{Pseudo}_{\text{UID}} = \text{card1} \parallel \text{card2} \parallel \text{card3} \parallel \text{card4} \parallel \text{card5} \parallel \text{card6} \parallel \text{addr1} \parallel \text{email domain} \parallel \text{Card birthday}$$
 
 5. **Rolling statistics for a 24-hour user window.** Sudden fraud spikes and
    deviations from a user's average transaction frequency are useful
@@ -183,16 +183,18 @@ $p = P(\text{fraud} \mid x)$. Bayes decision theory chooses the action with the
 **lowest posterior expected cost** for each transaction. The model estimates;
 the cost structure decides.
 
-Notation: *$A$* = transaction amount, *$$F = A + \text{Fee}_{\text{cb}}$$* =
-exposure if fraud gets through, *$$C_{\text{audit}}$$* = cost per manual review,
-*$c$* = human catch rate (recall), and *$$C_{\text{churn}}$$* = cost of wrongly
-declining a legitimate customer.
+Notation:  
+* *$A$*: Transaction amount
+* *$F = A + \text{Fee}_{\text{cb}}$*: Financial exposure if fraud gets through  
+* *$C_{\text{audit}}$*: Cost per manual review  
+* *$c$*: Human catch rate (recall)  
+* *$C_{\text{churn}}$*: Cost of wrongly declining a legitimate customer  
 
 | Action | Expected cost | Interpretation |
 | :--- | :--- | :--- |
 | Approve |$$E[\text{Cost}_{\text{Approve}}] = p \cdot F$$ | If fraud, lose the amount plus chargeback fee; if legitimate, cost is 0. |
-| Review |$$E[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p\,(1-c)\,F$$ | Always pay the audit; fraud is lost only if the reviewer misses it. |
-| Decline |$$E[\text{Cost}_{\text{Decline}}] = (1-p)\cdot C_{\text{churn}}$$ | If legitimate, lose a customer; if fraud, cost is 0. |
+| Review |$$\mathbb{E}[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p(1 - c)F$$ | Always pay the audit; fraud is lost only if the reviewer misses it. |
+| Decline |$$\mathbb{E}[\text{Cost}_{\text{Decline}}] = (1 - p) \cdot C_{\text{churn}}$$ | If legitimate, lose a customer; if fraud, cost is 0. |
 
 An action is selected only if its expected cost is strictly lower than the
 expected cost of the alternatives.
@@ -220,7 +222,7 @@ expected cost of the alternatives.
   The audit cost is always paid, plus residual fraud loss if the human
   reviewer misses the fraud.
 
-**Breakeven rule:** When $$(A + \text{Fee}_{\text{cb}}) \le C_{\text{audit}}$$,
+**Breakeven rule:** When $(A + \text{Fee}_{\text{cb}}) \le C_{\text{audit}}$,
 bypass manual review because inspecting costs more than the total exposure.
 Route directly to approve or decline, whichever has lower expected cost.
 
