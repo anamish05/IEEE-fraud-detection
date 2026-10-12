@@ -406,8 +406,8 @@ def show_test_pipeline() -> None:
 
 def show_business_impact() -> None:
     show_hero(
-        BUSINESS_IMPACT_PAGE,
-        "Experiment with parameters to see how fraud loss, review costs, and churn trade off.",
+        "Fraud Policy Simulator: What If Costs Change?",
+        "Change the cost of fraud, manual review and customer churn, and see how the optimal approve / review / decline thresholds, review queue and total cost respond.",
     )
     policy = json.loads(DEFAULT_POLICY.read_text(encoding="utf-8"))
     economics = policy["economics"]
@@ -517,20 +517,17 @@ def show_business_impact() -> None:
             "churn_cost": "Churn Cost",
         }
     )
-    color_scale = alt.Scale(
-        domain=["Total Cost", "Fraud Loss", "OpEx Cost", "Churn Cost"],
-        range=["#3182f6", "#6178a8", "#229447", "#70a91c"],
+    x_domain_min = float(cost_curve[x_column].min())
+    x_domain_max = (
+        0.7
+        if sweep_threshold == "P of decline"
+        else float(cost_curve[x_column].max())
     )
+    x_scale = alt.Scale(domain=[x_domain_min, x_domain_max], clamp=True)
     x_encoding = alt.X(
         f"{x_column}:Q",
         title=x_title,
-        scale=alt.Scale(
-            domain=[
-                float(cost_curve[x_column].min()),
-                0.7 if sweep_threshold == "P of decline" else float(cost_curve[x_column].max()),
-            ],
-            clamp=True,
-        ),
+        scale=x_scale,
         axis=alt.Axis(format=".2f", labelAngle=-35),
     )
     threshold_tooltips = [
@@ -544,9 +541,47 @@ def show_business_impact() -> None:
         total_cost_padding = max(abs(total_cost_min) * 0.01, 1.0)
     else:
         total_cost_padding = (total_cost_max - total_cost_min) * 0.05
-    total_chart = (
+    infeasible_rows = cost_curve.loc[
+        cost_curve["is_feasible"] == 0, x_column
+    ].sort_values().to_numpy(dtype=np.float64)
+    sweep_values = np.sort(cost_curve[x_column].to_numpy(dtype=np.float64))
+    infeasible_bands: list[dict[str, float]] = []
+    for threshold in infeasible_rows:
+        sample_index = int(np.searchsorted(sweep_values, threshold))
+        previous_midpoint = (
+            (sweep_values[sample_index - 1] + threshold) / 2
+            if sample_index > 0
+            else threshold - (sweep_values[1] - threshold) / 2
+        )
+        next_midpoint = (
+            (threshold + sweep_values[sample_index + 1]) / 2
+            if sample_index < len(sweep_values) - 1
+            else threshold + (threshold - sweep_values[sample_index - 1]) / 2
+        )
+        infeasible_bands.append(
+            {
+                "x_start": max(previous_midpoint, x_domain_min),
+                "x_end": min(next_midpoint, x_domain_max),
+            }
+        )
+    infeasible_data = pd.DataFrame(
+        infeasible_bands, columns=["x_start", "x_end"]
+    )
+    infeasible_region = (
+        alt.Chart(infeasible_data)
+        .mark_rect(color="#888", opacity=0.12)
+        .encode(
+            x=alt.X("x_start:Q", scale=x_scale, axis=None),
+            x2="x_end:Q",
+        )
+    )
+    total_line = (
         alt.Chart(cost_curve)
-        .mark_line(point=alt.OverlayMarkDef(filled=True, size=42), strokeWidth=2.5)
+        .mark_line(
+            color="#3182f6",
+            point=alt.OverlayMarkDef(filled=True, size=42),
+            strokeWidth=2.5,
+        )
         .encode(
             x=x_encoding,
             y=alt.Y(
@@ -560,9 +595,8 @@ def show_business_impact() -> None:
                     zero=False,
                     nice=False,
                 ),
-                axis=alt.Axis(format=",.2s"),
+                axis=alt.Axis(format=",.0f"),
             ),
-            color=alt.value("#3182f6"),
             order=f"{x_column}:Q",
             tooltip=[
                 alt.Tooltip(f"{x_column}:Q", title=x_tooltip_title, format=".4f"),
@@ -572,58 +606,23 @@ def show_business_impact() -> None:
         )
     )
 
-    component_min = float(component_data["Expected cost (€)"].min())
-    component_max = float(component_data["Expected cost (€)"].max())
-    component_padding = (
-        max(abs(component_min) * 0.01, 1.0)
-        if component_min == component_max
-        else (component_max - component_min) * 0.05
-    )
-    component_chart = (
-        alt.Chart(component_data)
-        .mark_line(point=alt.OverlayMarkDef(filled=True, size=42), strokeWidth=2.5)
-        .encode(
-            x=x_encoding,
-            y=alt.Y(
-                "Expected cost (€):Q",
-                title="Cost Components (€)",
-                scale=alt.Scale(
-                    domain=[
-                        component_min - component_padding,
-                        component_max + component_padding,
-                    ],
-                    zero=False,
-                    nice=False,
-                ),
-                axis=alt.Axis(format=",.2s"),
-            ),
-            color=alt.Color(
-                "Cost type:N",
-                title=None,
-                scale=color_scale,
-                sort=["Fraud Loss", "OpEx Cost", "Churn Cost"],
-            ),
-            detail="Cost type:N",
-            order=f"{x_column}:Q",
-            tooltip=[
-                alt.Tooltip("Cost type:N", title="Cost component"),
-                alt.Tooltip(f"{x_column}:Q", title=x_tooltip_title, format=".4f"),
-                *threshold_tooltips,
-                alt.Tooltip("Expected cost (€):Q", format=",.2f"),
-            ],
-        )
-    )
-
+    total_layers = []
+    if not infeasible_data.empty:
+        total_layers.append(infeasible_region)
+    total_layers.append(total_line)
     if optimal_policy is not None:
+        optimal_x = float(selected_policy[x_column])
+        optimum_rule = (
+            alt.Chart(pd.DataFrame({x_column: [optimal_x]}))
+            .mark_rule(strokeDash=[4, 4], color="#3182f6")
+            .encode(
+                x=alt.X(f"{x_column}:Q", scale=x_scale, axis=None)
+            )
+        )
         optimal_point = (
             alt.Chart(
                 pd.DataFrame(
-                    [
-                        {
-                            x_column: float(selected_policy[x_column]),
-                            "total_cost": total_expected_cost,
-                        }
-                    ]
+                    [{x_column: optimal_x, "total_cost": total_expected_cost}]
                 )
             )
             .mark_point(
@@ -635,7 +634,7 @@ def show_business_impact() -> None:
                 strokeWidth=1.5,
             )
             .encode(
-                x=f"{x_column}:Q",
+                x=alt.X(f"{x_column}:Q", scale=x_scale, axis=None),
                 y="total_cost:Q",
                 tooltip=[
                     alt.Tooltip(
@@ -651,20 +650,156 @@ def show_business_impact() -> None:
                 ],
             )
         )
-        total_chart = alt.layer(total_chart, optimal_point)
+        total_layers.extend([optimum_rule, optimal_point])
+    if not infeasible_data.empty:
+        widest_band = max(
+            infeasible_bands, key=lambda band: band["x_end"] - band["x_start"]
+        )
+        capacity_label = (
+            alt.Chart(
+                pd.DataFrame(
+                    [
+                        {
+                            x_column: (widest_band["x_start"] + widest_band["x_end"]) / 2,
+                            "label_y": total_cost_max + total_cost_padding * 0.7,
+                        }
+                    ]
+                )
+            )
+            .mark_text(color="#666", fontSize=11, text="Exceeds review capacity")
+            .encode(
+                x=alt.X(f"{x_column}:Q", scale=x_scale, axis=None),
+                y=alt.Y(
+                    "label_y:Q",
+                    scale=alt.Scale(
+                        domain=[
+                            total_cost_min - total_cost_padding,
+                            total_cost_max + total_cost_padding,
+                        ],
+                        zero=False,
+                        nice=False,
+                    ),
+                ),
+            )
+        )
+        total_layers.append(capacity_label)
+    total_chart = alt.layer(*total_layers)
+
+    component_colors = {
+        "Fraud Loss": "#c0392b",
+        "OpEx Cost": "#2c6fbb",
+        "Churn Cost": "#e08e0b",
+    }
+    panels = []
+    for component_name, component_color in component_colors.items():
+        component_frame = component_data.loc[
+            component_data["Cost type"] == component_name
+        ]
+        panel_x = x_encoding if component_name == "Churn Cost" else x_encoding.axis(None)
+        component_line = (
+            alt.Chart(component_frame)
+            .mark_line(
+                color=component_color,
+                point=alt.OverlayMarkDef(filled=True, size=30),
+                strokeWidth=2.5,
+            )
+            .encode(
+                x=panel_x,
+                y=alt.Y(
+                    "Expected cost (€):Q",
+                    title=None,
+                    scale=alt.Scale(zero=False, nice=True),
+                    axis=alt.Axis(format=",.2s", title=None),
+                ),
+                order=f"{x_column}:Q",
+                tooltip=[
+                    alt.Tooltip("Cost type:N", title="Cost component"),
+                    alt.Tooltip(f"{x_column}:Q", title=x_tooltip_title, format=".4f"),
+                    *threshold_tooltips,
+                    alt.Tooltip("Expected cost (€):Q", format=",.0f"),
+                ],
+            )
+        )
+        panel_layers = []
+        if not infeasible_data.empty:
+            panel_layers.append(infeasible_region)
+        panel_layers.append(component_line)
+        if optimal_policy is not None:
+            panel_layers.append(optimum_rule)
+        panels.append(
+            alt.layer(*panel_layers).properties(
+                title=f"{component_name} (€)",
+                height=90,
+                width="container",
+            )
+        )
+    component_chart = alt.vconcat(
+        *panels, spacing=8, title="What drives the total cost?"
+    ).resolve_scale(y="independent")
     chart = alt.vconcat(
         total_chart.properties(
             title="Total Expected Cost (€)",
             height=220,
             width="container",
         ),
-        component_chart.properties(
-            title="Cost Components (OpEx vs Churn vs Fraud Loss)",
-            height=250,
-            width="container",
-        ),
+        component_chart,
         spacing=20,
     ).resolve_scale(y="independent")
+    total_cost_range_percent = (
+        (total_cost_max - total_cost_min) / total_cost_min * 100
+    )
+    total_cost_range_caption = (
+        f"Total cost varies by only {total_cost_range_percent:.1f}% across this sweep "
+        f"(€{total_cost_min:,.0f} – €{total_cost_max:,.0f}). "
+        "The axis is zoomed in to show the shape."
+    )
+
+    with st.expander("📘 How does this simulator work?", expanded=False):
+        st.markdown(
+            """
+            **The model gives each transaction a fraud probability *p*.** The simulator
+            chooses the action with the lowest *expected cost* (Bayes decision theory).
+            With exposure **F = amount + chargeback fee**:
+
+            | Action | Expected cost | Meaning |
+            |---|---|---|
+            | ✅ Approve | p × F | If it is fraud, we lose the amount and the fee |
+            | 🔍 Review | audit cost + p × (1 − catch rate) × F | We always pay the audit; fraud is lost only if the reviewer misses it |
+            | ⛔ Decline | (1 − p) × churn cost | If it is legitimate, we lose a customer |
+
+            **Break-even probabilities** (where two actions cost the same):
+            - Approve → Review at **p = audit cost / (catch rate × F)**
+            - Review → Decline at **p = (churn − audit) / (churn + (1 − catch rate) × F)**
+
+            The two sliders for *P of approve* / *P of decline* are global guardrails.
+            Transactions in the review band are routed straight to approve or decline when
+            that is cheaper. The **◆** marks the cheapest threshold that keeps the review
+            queue within capacity.
+
+            **Try this:** raise *churn cost* (fewer declines), raise *audit cost* (smaller
+            review band), lower *queue capacity* (forces more automatic decisions).
+            Costs are computed from predicted probabilities, not observed fraud labels.
+            """
+        )
+        ex_amt = st.number_input(
+            "Example transaction amount (€)",
+            min_value=1.0, max_value=5000.0,
+            value=float(np.median(amounts)), step=10.0,
+        )
+        F = ex_amt + chargeback_fee
+        p_ad = churn_cost / (F + churn_cost)
+        p_a = review_cost / (catch_rate * F) if catch_rate > 0 else float("inf")
+        p_d = (churn_cost - review_cost) / (churn_cost + (1 - catch_rate) * F)
+        if p_a < p_d:
+            st.info(
+                f"For a €{ex_amt:,.0f} transaction: approve if p < **{p_a:.3f}**, "
+                f"review between **{p_a:.3f}** and **{p_d:.3f}**, decline above **{p_d:.3f}**."
+            )
+        else:
+            st.info(
+                f"For a €{ex_amt:,.0f} transaction review never pays off with these "
+                f"costs: approve if p < **{p_ad:.3f}**, otherwise decline."
+            )
 
     st.subheader("Dual-Threshold Cost Optimization (6 months test dataset)")
     st.markdown(
@@ -688,54 +823,13 @@ def show_business_impact() -> None:
             f"{t_approve:.2f} / {t_decline:.2f}",
         )
     st.altair_chart(chart, width="stretch")
+    st.caption(total_cost_range_caption)
+    st.caption(
+        "Each panel has its own scale. Shaded areas exceed the review-queue capacity, "
+        "and the diamond is the cheapest feasible threshold. Raising the decline "
+        "threshold means fewer declines: churn cost falls while fraud loss rises."
+    )
 
-    with st.expander("📘 How does this simulator work?", expanded=False):
-        st.markdown(
-        """
-        **The model gives each transaction a fraud probability *p*.** The simulator
-        chooses the action with the lowest *expected cost* (Bayes decision theory).
-        With exposure **F = amount + chargeback fee**:
-
-        | Action | Expected cost | Meaning |
-        |---|---|---|
-        | ✅ Approve | p × F | If it is fraud, we lose the amount and the fee |
-        | 🔍 Review | audit cost + p × (1 − catch rate) × F | We always pay the audit; fraud is lost only if the reviewer misses it |
-        | ⛔ Decline | (1 − p) × churn cost | If it is legitimate, we lose a customer |
-
-        **Break-even probabilities** (where two actions cost the same):
-        - Approve → Review at **p = audit cost / (catch rate × F)**
-        - Review → Decline at **p = (churn − audit) / (churn + (1 − catch rate) × F)**
-
-        The two sliders for *P of approve* / *P of decline* are global guardrails.
-        Transactions in the review band are routed straight to approve or decline when
-        that is cheaper. The **◆** marks the cheapest threshold that keeps the review
-        queue within capacity.
-
-        **Try this:** raise *churn cost* (fewer declines), raise *audit cost* (smaller
-        review band), lower *queue capacity* (forces more automatic decisions).
-        Costs are computed from predicted probabilities, not observed fraud labels.
-                """
-            )
-        ex_amt = st.number_input(
-            "Example transaction amount (€)",
-            min_value=1.0, max_value=5000.0,
-            value=float(np.median(amounts)), step=10.0,
-        )
-        F = ex_amt + chargeback_fee
-        p_ad = churn_cost / (F + churn_cost)
-        p_a = review_cost / (catch_rate * F) if catch_rate > 0 else float("inf")
-        p_d = (churn_cost - review_cost) / (churn_cost + (1 - catch_rate) * F)
-        if p_a < p_d:
-            st.info(
-                f"For a €{ex_amt:,.0f} transaction: approve if p < **{p_a:.3f}**, "
-                f"review between **{p_a:.3f}** and **{p_d:.3f}**, decline above **{p_d:.3f}**."
-            )
-        else:
-            st.info(
-                f"For a €{ex_amt:,.0f} transaction review never pays off with these "
-                f"costs: approve if p < **{p_ad:.3f}**, otherwise decline."
-            )
-            
     st.subheader("Sensitivity parameters")
     st.selectbox(
         "Threshold to sweep on the x-axis",
@@ -966,7 +1060,7 @@ def show_business_impact() -> None:
 
 
 with st.sidebar:
-    st.title("Vesta IEEE-CIS | Fraud")
+    st.title("Fraud Policy Simulator")
     page = st.radio(
         "Report sections",
         [
