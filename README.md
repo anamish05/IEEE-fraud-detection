@@ -184,17 +184,17 @@ $p = P(\text{fraud} \mid x)$. Bayes decision theory chooses the action with the
 the cost structure decides.
 
 Notation:  
-* *$A$*: Transaction amount
-* *$F = A + \text{Fee}_{\text{cb}}$*: Financial exposure if fraud gets through  
-* *$C_{\text{audit}}$*: Cost per manual review  
-* *$c$*: Human catch rate (recall)  
-* *$C_{\text{churn}}$*: Cost of wrongly declining a legitimate customer  
+* $A$: Transaction amount  
+* $F = A + \text{Fee}_{\text{cb}}$: Financial exposure if fraud gets through  
+* $C_{\text{audit}}$: Cost per manual review  
+* $c$: Human catch rate (recall)  
+* $C_{\text{churn}}$: Cost of wrongly declining a legitimate customer  
 
 | Action | Expected cost | Interpretation |
 | :--- | :--- | :--- |
-| Approve |$$E[\text{Cost}_{\text{Approve}}] = p \cdot F$$ | If fraud, lose the amount plus chargeback fee; if legitimate, cost is 0. |
-| Review |$$\mathbb{E}[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p(1 - c)F$$ | Always pay the audit; fraud is lost only if the reviewer misses it. |
-| Decline |$$\mathbb{E}[\text{Cost}_{\text{Decline}}] = (1 - p) \cdot C_{\text{churn}}$$ | If legitimate, lose a customer; if fraud, cost is 0. |
+| Approve | $E[\text{Cost}_{\text{Approve}}] = p \cdot F$ | If fraud, lose the amount plus chargeback fee; if legitimate, cost is 0. |
+| Review | $E[\text{Cost}_{\text{Review}}] = C_{\text{audit}} + p(1 - c)F$ | Always pay the audit; fraud is lost only if the reviewer misses it. |
+| Decline | $E[\text{Cost}_{\text{Decline}}] = (1 - p) \cdot C_{\text{churn}}$ | If legitimate, lose a customer; if fraud, cost is 0. |
 
 An action is selected only if its expected cost is strictly lower than the
 expected cost of the alternatives.
@@ -251,7 +251,7 @@ $$\min_{T_{\text{approve}}, T_{\text{decline}}} \sum_{i} \Big( E[\text{Cost}_{\t
   **Human recall:** 90%
 - **Chargeback fee ($\text{Fee}_{\text{cb}}$):** €15.00 per incident |
   **Customer churn cost:** €10.00
-- **Breakeven gating rule:** When $$(A + \text{Fee}_{\text{cb}}) \le C_{\text{audit}}$$, manual review is bypassed because inspecting costs more
+- **Breakeven gating rule:** When $(A + \text{Fee}_{\text{cb}}) \le C_{\text{audit}}$, manual review is bypassed because inspecting costs more
   than the total exposure. Transactions are routed directly to Approve or
   Decline based on expected loss. The capacity constraint also matters:
   without it, the Bayes rule would send every transaction with $p$ above the
