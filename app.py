@@ -689,6 +689,53 @@ def show_business_impact() -> None:
         )
     st.altair_chart(chart, width="stretch")
 
+    with st.expander("📘 How does this simulator work?", expanded=False):
+        st.markdown(
+        """
+        **The model gives each transaction a fraud probability *p*.** The simulator
+        chooses the action with the lowest *expected cost* (Bayes decision theory).
+        With exposure **F = amount + chargeback fee**:
+
+        | Action | Expected cost | Meaning |
+        |---|---|---|
+        | ✅ Approve | p × F | If it is fraud, we lose the amount and the fee |
+        | 🔍 Review | audit cost + p × (1 − catch rate) × F | We always pay the audit; fraud is lost only if the reviewer misses it |
+        | ⛔ Decline | (1 − p) × churn cost | If it is legitimate, we lose a customer |
+
+        **Break-even probabilities** (where two actions cost the same):
+        - Approve → Review at **p = audit cost / (catch rate × F)**
+        - Review → Decline at **p = (churn − audit) / (churn + (1 − catch rate) × F)**
+
+        The two sliders for *P of approve* / *P of decline* are global guardrails.
+        Transactions in the review band are routed straight to approve or decline when
+        that is cheaper. The **◆** marks the cheapest threshold that keeps the review
+        queue within capacity.
+
+        **Try this:** raise *churn cost* (fewer declines), raise *audit cost* (smaller
+        review band), lower *queue capacity* (forces more automatic decisions).
+        Costs are computed from predicted probabilities, not observed fraud labels.
+                """
+            )
+        ex_amt = st.number_input(
+            "Example transaction amount (€)",
+            min_value=1.0, max_value=5000.0,
+            value=float(np.median(amounts)), step=10.0,
+        )
+        F = ex_amt + chargeback_fee
+        p_ad = churn_cost / (F + churn_cost)
+        p_a = review_cost / (catch_rate * F) if catch_rate > 0 else float("inf")
+        p_d = (churn_cost - review_cost) / (churn_cost + (1 - catch_rate) * F)
+        if p_a < p_d:
+            st.info(
+                f"For a €{ex_amt:,.0f} transaction: approve if p < **{p_a:.3f}**, "
+                f"review between **{p_a:.3f}** and **{p_d:.3f}**, decline above **{p_d:.3f}**."
+            )
+        else:
+            st.info(
+                f"For a €{ex_amt:,.0f} transaction review never pays off with these "
+                f"costs: approve if p < **{p_ad:.3f}**, otherwise decline."
+            )
+            
     st.subheader("Sensitivity parameters")
     st.selectbox(
         "Threshold to sweep on the x-axis",
@@ -920,16 +967,15 @@ def show_business_impact() -> None:
 
 with st.sidebar:
     st.title("Vesta IEEE-CIS | Fraud")
-    default_page_index = 3 if st.query_params.get("page") == "business-impact" else 0
     page = st.radio(
         "Report sections",
         [
+            BUSINESS_IMPACT_PAGE,
             "Business problem and model pipeline",
             "Model & SHAP",
             "Testing pipeline",
-            BUSINESS_IMPACT_PAGE,
         ],
-        index=default_page_index,
+        index=0,
         label_visibility="collapsed",
     )
     st.markdown("---")
