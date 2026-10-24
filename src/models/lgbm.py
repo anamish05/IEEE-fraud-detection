@@ -3,8 +3,10 @@ from typing import Any, Dict, List, Tuple
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, average_precision_score, precision_score, recall_score
 from sklearn.model_selection import TimeSeriesSplit
+import mlflow
+import mlflow.lightgbm
 
 
 def train_time_series_lgb(
@@ -14,15 +16,22 @@ def train_time_series_lgb(
         params: Dict[str,Any],
         n_splits: int=5,
         num_boost_round=1500,
-        early_stopping_rounds: int=50
-) -> Tuple[List[lgb.Booster], np.ndarray, List[float]]:
+        early_stopping_rounds: int=50,
+        thresh: float=0.2,
+        log_mlflow=True
+) -> Tuple[List[lgb.Booster], np.ndarray, Dict[str, List[float]]]:
     
     """Trains LightGBM models using TimeSeriesSplit cross-validation."""
 
     tscv = TimeSeriesSplit(n_splits=n_splits)
 
     oof_preds = np.full(len(df), np.nan, dtype=np.float32)
-    fold_scores = []
+    metrics = {
+        "roc_auc": [],
+        "pr_auc": [],
+        "precision": [],
+        "recall": []
+    }
     models = []
 
     print(f"Starting {n_splits}-Fold TimeSeriesSplit across full dataset...\n")
@@ -58,17 +67,41 @@ def train_time_series_lgb(
         )
 
         # Predict validation segment
-        val_preds = model.predict(X_val)
+        val_preds = model.predict(X_val, num_iteration=model.best_iteration)
         oof_preds[val_idx] = val_preds
         
-        val_auc = roc_auc_score(y_val, val_preds)
-        fold_scores.append(val_auc)
+        val_roc_auc = roc_auc_score(y_val, val_preds)
+        val_pr_auc = average_precision_score(y_val, val_preds)
+        val_precision = precision_score(y_val, (val_preds >= thresh).astype(int), zero_division=0)
+        val_recall = recall_score(y_val, (val_preds >= thresh).astype(int), zero_division=0)
+
+        metrics["roc_auc"].append(val_roc_auc)
+        metrics["pr_auc"].append(val_pr_auc)
+        metrics["precision"].append(val_precision)
+        metrics["recall"].append(val_recall)
         models.append(model)
 
-        print(f"Fold {fold} Best Iteration: {model.best_iteration} | Val ROC-AUC: {val_auc:.5f}\n")
+        if log_mlflow and mlflow.active_run():
+            with mlflow.start_run(run_name=f"fold_{fold}", nested=True):
+                mlflow.log_params({
+                    "fold": fold,
+                    "train_count": len(train_idx),
+                    "val_count": len(val_idx),
+                    "best_iteration": model.best_iteration
+                })
+                mlflow.log_metrics({
+                    "val_roc_auc": val_roc_auc,
+                    "val_pr_auc": val_pr_auc,
+                    "val_precision_0.3": val_precision,
+                    "val_recall_0.3": val_recall
+                })
+                # Log the booster model artifact for this fold
+                mlflow.lightgbm.log_model(model, artifact_path="model")
+
+        print(f"Fold {fold} Best Iteration: {model.best_iteration} | Val ROC-AUC: {val_roc_auc:.5f} | Val PR-AUC: {val_pr_auc:.5f} | Val Precision: {val_precision:.5f} | Val Recall: {val_recall:.5f}\n")
 
         # Clean up before allocating the next fold
         del dtrain, dval, X_val, y_val
         gc.collect()
 
-    return models, oof_preds, fold_scores
+    return models, oof_preds, metrics
