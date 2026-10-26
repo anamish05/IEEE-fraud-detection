@@ -321,10 +321,9 @@ def show_model_and_shap() -> None:
     )
     metrics = pd.DataFrame(
         [
-            ("Logistic regression — expanding window", 0.82788, 0.39200),
-            ("LightGBM — expanding window", 0.91670, 0.59896),
-            ("LightGBM — chronological 80/20", 0.94272, 0.66854),
-            ("DLRM — 5-fold expanding-window OOF", 0.87440, 0.53673),
+            ("Logistic regression", 0.82788, 0.39200),
+            ("LightGBM", 0.91670, 0.59896),
+            ("DLRM", 0.87440, 0.53673),
         ],
         columns=["Model / evaluation", "ROC-AUC", "PR-AUC"],
     )
@@ -335,11 +334,7 @@ def show_model_and_shap() -> None:
     )
 
     st.markdown(
-        "**Model selection: LightGBM for serving.** DLRM is evaluated with "
-        "5-fold expanding-window out-of-fold predictions; its window differs "
-        "from the chronological 80/20 LightGBM holdout, so compare the metrics "
-        "with that distinction in mind. The rank-normalized LightGBM/DLRM blend "
-        "is evaluated offline."
+        "**Model selection: LightGBM for serving.** "
     )
 
     st.subheader("SHAP: what moves risk scores")
