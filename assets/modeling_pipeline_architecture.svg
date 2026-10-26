@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1290" viewBox="0 0 1600 1290" role="img" aria-labelledby="title desc">
   <title id="title">End-to-end fraud detection modeling pipeline</title>
-  <desc id="desc">IEEE-CIS transaction and identity data flow through feature engineering, LightGBM and a three-branch multimodal neural network, rank-normalized ensemble evaluation, and streaming decisioning.</desc>
+  <desc id="desc">IEEE-CIS transaction and identity data flow through feature engineering, LightGBM and a DLRM model, rank-normalized ensemble evaluation, and streaming decisioning.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
       <path d="M0,0 L10,5 L0,10 Z" fill="#71829b"/>
@@ -31,7 +31,7 @@
   <circle cx="1510" cy="60" r="70" fill="#e1edf4"/>
 
   <text x="64" y="61" class="title">Fraud Detection Modeling Pipeline</text>
-  <text x="66" y="91" class="subtitle">IEEE-CIS | engineered tabular signals + behavioral sequences + device semantics</text>
+  <text x="66" y="91" class="subtitle">IEEE-CIS | engineered dense and categorical features + pairwise interactions</text>
   <rect x="1324" y="42" width="212" height="34" rx="17" fill="#e5f3f2"/>
   <circle cx="1343" cy="59" r="5" fill="#148a8a"/>
   <text x="1356" y="63" class="tiny" fill="#147b7b">END-TO-END WORKFLOW</text>
@@ -107,37 +107,37 @@
   <rect x="660" y="400" width="880" height="8" rx="4" fill="#7657a8"/>
   <circle cx="690" cy="439" r="15" fill="#7657a8"/>
   <text x="690" y="443" text-anchor="middle" class="section-no">04</text>
-  <text x="716" y="445" class="section">Fused multimodal neural network</text>
-  <text x="684" y="470" class="small">04_NN_sequence.ipynb  |  three representations, one fraud classifier</text>
+  <text x="716" y="445" class="section">DLRM model</text>
+  <text x="684" y="470" class="small">04_DLRM.ipynb  |  dense features, categorical embeddings, pairwise interactions</text>
 
   <rect x="684" y="489" width="264" height="104" rx="11" fill="#f0f4fb" stroke="#dce6f3"/>
   <rect x="700" y="505" width="7" height="70" rx="3" fill="#5076a5"/>
-  <text x="721" y="518" class="tiny">BRANCH A</text>
-  <text x="721" y="540" class="label">Static tabular</text>
-  <text x="721" y="560" class="small">Continuous inputs + categorical</text>
-  <text x="721" y="576" class="small">embedding tables → static MLP</text>
+  <text x="721" y="518" class="tiny">DENSE FEATURES</text>
+  <text x="721" y="540" class="label">Transaction signals</text>
+  <text x="721" y="560" class="small">Continuous inputs</text>
+  <text x="721" y="576" class="small">Bottom MLP → shared vector</text>
 
   <rect x="968" y="489" width="264" height="104" rx="11" fill="#edf7f6" stroke="#d6ebe8"/>
   <rect x="984" y="505" width="7" height="70" rx="3" fill="#148a8a"/>
-  <text x="1005" y="518" class="tiny">BRANCH B</text>
-  <text x="1005" y="540" class="label">User transaction history</text>
-  <text x="1005" y="560" class="small">Up to 15 prior events × 5 signals</text>
-  <text x="1005" y="576" class="small">Masked Transformer encoder</text>
+  <text x="1005" y="518" class="tiny">CATEGORICAL FEATURES</text>
+  <text x="1005" y="540" class="label">Categorical fields</text>
+  <text x="1005" y="560" class="small">Learned embedding tables</text>
+  <text x="1005" y="576" class="small">Shared-dimension vectors</text>
 
   <rect x="1252" y="489" width="264" height="104" rx="11" fill="#f6f1fa" stroke="#e9def2"/>
   <rect x="1268" y="505" width="7" height="70" rx="3" fill="#9a70b6"/>
-  <text x="1289" y="518" class="tiny">BRANCH C</text>
-  <text x="1289" y="540" class="label">Device semantics</text>
-  <text x="1289" y="560" class="small">DeviceInfo → frozen</text>
-  <text x="1289" y="576" class="small">SentenceTransformer embedding</text>
+  <text x="1289" y="518" class="tiny">FEATURE INTERACTIONS</text>
+  <text x="1289" y="540" class="label">Pairwise dot products</text>
+  <text x="1289" y="560" class="small">Dense + categorical vectors</text>
+  <text x="1289" y="576" class="small">Normalized interactions</text>
 
   <path d="M816 593 V609 H1100" class="line-plain"/>
   <path d="M1100 593 V609" class="line-plain"/>
   <path d="M1384 593 V609 H1100" class="line-plain"/>
   <path d="M1100 609 V623" class="line-teal"/>
   <rect x="881" y="625" width="438" height="54" rx="12" fill="#eaf5f4" stroke="#b9dfdc"/>
-  <text x="1100" y="648" text-anchor="middle" class="label">Concatenate representations → fusion classifier</text>
-  <text x="1100" y="667" text-anchor="middle" class="small">Single neural fraud-probability output</text>
+  <text x="1100" y="648" text-anchor="middle" class="label">Dense vector + interactions → top MLP</text>
+  <text x="1100" y="667" text-anchor="middle" class="small">Single fraud-probability output</text>
   <rect x="1030" y="691" width="140" height="22" rx="11" fill="#e8f3f2"/>
   <text x="1100" y="706" text-anchor="middle" class="tiny" fill="#147b7b">VALIDATION SCORES</text>
 
@@ -158,18 +158,18 @@
 
   <rect x="274" y="913" width="218" height="53" rx="10" fill="#fbf5ec"/>
   <text x="383" y="935" text-anchor="middle" class="label">Rank normalization</text>
-  <text x="383" y="953" text-anchor="middle" class="small">LGBM + NN scores</text>
+  <text x="383" y="953" text-anchor="middle" class="small">LGBM + DLRM scores</text>
   <path d="M492 939 H530" class="line"/>
   <rect x="540" y="913" width="218" height="53" rx="10" fill="#fbf5ec"/>
   <text x="649" y="935" text-anchor="middle" class="label">Weight search</text>
-  <text x="649" y="953" text-anchor="middle" class="small">Optimize holdout ROC-AUC</text>
+  <text x="649" y="953" text-anchor="middle" class="small">Optimize holdout PR-AUC</text>
   <path d="M758 939 H796" class="line"/>
   <rect x="806" y="913" width="218" height="53" rx="10" fill="#fbf5ec"/>
   <text x="915" y="935" text-anchor="middle" class="label">Selected blend</text>
-  <text x="915" y="953" text-anchor="middle" class="small">95% LightGBM + 5% NN</text>
+  <text x="915" y="953" text-anchor="middle" class="small">90% LightGBM + 10% DLRM</text>
   <path d="M1024 939 H1062" class="line"/>
   <rect x="1072" y="913" width="254" height="53" rx="10" fill="#fbf5ec"/>
-  <text x="1199" y="935" text-anchor="middle" class="label">Compare ROC-AUC / PR-AUC</text>
+  <text x="1199" y="935" text-anchor="middle" class="label">Compare ROC-AUC / PR-AUC / Recall</text>
   <text x="1199" y="953" text-anchor="middle" class="small">Against each standalone model</text>
 
   <rect x="250" y="1035" width="1100" height="166" rx="18" class="card"/>

@@ -290,9 +290,10 @@ def show_summary() -> None:
 
     st.subheader("Final model selection")
     st.write(
-        "LightGBM was selected as the final model. The streaming test workflow scores "
-        "transactions in chronological chunks, rebuilds causal features, and "
-        "routes each probability to approve, review, or decline."
+        "LightGBM was selected for serving, while the DLRM model and a "
+        "rank-normalized blend are evaluated offline. The streaming test workflow "
+        "scores transactions in chronological chunks, rebuilds causal features, "
+        "and routes each probability to approve, review, or decline."
     )
     st.markdown(
         'See business impact of the developed model and Bayes theory based '
@@ -323,8 +324,7 @@ def show_model_and_shap() -> None:
             ("Logistic regression — expanding window", 0.82788, 0.39200),
             ("LightGBM — expanding window", 0.91670, 0.59896),
             ("LightGBM — chronological 80/20", 0.94272, 0.66854),
-            ("Neural network — chronological 80/20", 0.88958, 0.50286),
-            ("Rank blend (95% LightGBM / 5% NN)", 0.94293, 0.66185),
+            ("DLRM — 5-fold expanding-window OOF", 0.87440, 0.53673),
         ],
         columns=["Model / evaluation", "ROC-AUC", "PR-AUC"],
     )
@@ -335,11 +335,11 @@ def show_model_and_shap() -> None:
     )
 
     st.markdown(
-        """
-        **Model selection: LightGBM.** The rank blend improved ROC-AUC by just
-        0.00021 over LightGBM but had lower PR-AUC. For the rare-fraud use case,
-        the added neural-network complexity did not justify selecting the blend.
-        """
+        "**Model selection: LightGBM for serving.** DLRM is evaluated with "
+        "5-fold expanding-window out-of-fold predictions; its window differs "
+        "from the chronological 80/20 LightGBM holdout, so compare the metrics "
+        "with that distinction in mind. The rank-normalized LightGBM/DLRM blend "
+        "is evaluated offline."
     )
 
     st.subheader("SHAP: what moves risk scores")

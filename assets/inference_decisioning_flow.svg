@@ -137,6 +137,6 @@
   <circle cx="87" cy="818" r="12" fill="#eaf0f7"/>
   <text x="87" y="822" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#5076a5">i</text>
   <text x="111" y="814" class="label">Serving scope</text>
-  <text x="111" y="832" class="body">This inference path uses LightGBM; the neural-network rank blend is evaluated offline, not served here.</text>
+  <text x="111" y="832" class="body">This inference path uses LightGBM; the DLRM rank blend is evaluated offline, not served here.</text>
   <text x="1420" y="866" text-anchor="end" class="tiny">IEEE-CIS FRAUD DETECTION</text>
 </svg>
