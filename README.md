@@ -71,7 +71,7 @@ provided for privacy protection and contractual reasons.
 
 ### Key metrics
 
-The evaluation uses ROC-AUC and PR-AUC, which are useful for imbalanced datasets:
+The evaluation uses ROC-AUC and PR-AUC, Precision and Recall, which are useful for imbalanced datasets:
 
 - **ROC-AUC** measures how well the model ranks fraud above legitimate
   transactions across the full dataset using the true-positive and
@@ -81,6 +81,8 @@ The evaluation uses ROC-AUC and PR-AUC, which are useful for imbalanced datasets
 - **PR-AUC** focuses on fraud precision and recall: whether flagged
   transactions are actually fraudulent and how many fraud cases are caught.
   This makes it a stricter, more realistic metric for rare fraud events.
+- **Recall** focuses on missed fraud: It measures what proportion of actual fraudulent transactions the model successfully caught. High recall minimizes financial loss by ensuring fraudulent activity does not slip through undetected.  
+- **Precision** focuses on false alarms: It measures what proportion of flagged transactions were actually fraudulent. In a rare-event scenario, high precision protects legitimate customers from unnecessary transaction declines. 
 
 ### EDA insights
 
@@ -128,27 +130,55 @@ The evaluation uses ROC-AUC and PR-AUC, which are useful for imbalanced datasets
 
 ![Machine learning pipeline structure](assets/report_model_pipeline.png)
 
+### Hyper-Parameters for LGBM and DLRM  
+
+LightGBM 
+
+| Hyperparameter | Value |
+| :--- | :--- |
+| *objective* | `'binary'` |
+| *metric* | `'auc'` |
+| *boosting_type* | `'gbdt'` |
+| *learning_rate* | `0.03` |
+| *num_leaves* | `127` |
+| *max_depth* | `-1` |
+| *feature_fraction* | `0.8` |
+| *subsample* | `0.8` |
+| *random_state* | `SEED` |
+| *n_jobs* | `-1` |
+| *verbose* | `-1` |
+
+DLRM 
+
+| Hyperparameter | Value |
+| :--- | :--- |
+| *embedding_dim* | `16` |
+| *bottom_mlp_dims* | `[256, 128, 16]` |
+| *top_mlp_dims* | `[256, 128, 1]` |
+| *activation* | `'relu'` |
+| *interaction_type* | `'dot'` |
+| *dropout* | `0.2` |
+| *optimizer* | `'AdamW'` |
+| *learning_rate* | `1e-3` |
+| *weight_decay* | `1e-4` |
+| *scheduler* | `ReduceLROnPlateau` |
+| *batch_size* | `1024 train, 2048 eval (GPU)` |
+| *loss_function* | `'BCEWithLogitsLoss'` |
+| *epochs* | `15` |
+| *early_stopping_patience* | `3` |
+
+
 ### Training results
 
-| Model / evaluation | ROC-AUC | PR-AUC |
-|---|---:|---:|
-| Logistic regression - expanding-window | 0.82788 | 0.39200 |
-| LightGBM - expanding-window | 0.91670 | 0.59896 |
-| LightGBM - chronological 80/20 | 0.94272 | 0.66854 |
-| Neural network - chronological 80/20 | 0.88958 | 0.50286 |
-| Rank blend (95% LightGBM / 5% NN) - chronological 80/20 | 0.94293 | 0.66185 |
+| Model / evaluation | ROC-AUC | PR-AUC | Recall | Precision |
+|---|---:|---:|---:|---:|
+| Logistic regression  | 0.82788 | 0.39200 | 0.52989 | 0.24009 |
+| LightGBM | 0.91670 | 0.59896 | 0.50276 | 0.67334 |
+| DLRM | 0.87440 | 0.53673 | 0.54907 | 0.46737 |
 
 #### Takeaways
 
-- The ensemble increased ROC-AUC by only 0.00021 over LightGBM alone, while
-  LightGBM retained the higher PR-AUC. The neural network adds little signal
-  and may add noise.
-- Sequence models need repeated transactions, which are rare in this dataset.
-  LightGBM handles this cold-start issue by evaluating cards through overall
-  frequency counts and historical group risk rather than individual user
-  histories.
-- The 590k training transactions, with only 3.5% positive examples, are
-  insufficient for the neural network to add value here.
+- DLRM captures feature interactions effectively, but still trails LightGBM: by learning dense embeddings for high-cardinality categorical variables (like card_id, addr, and device_id) and explicitly modeling pairwise dot-product interactions with dense features, DLRM effectively handles tabular fraud data. However, it still falls slightly short of LightGBM because gradient-boosted decision trees naturally partition unnormalized continuous features and tabular split boundaries. 
 - **Final model selection: LightGBM.**
 
 ### SHAP analysis
